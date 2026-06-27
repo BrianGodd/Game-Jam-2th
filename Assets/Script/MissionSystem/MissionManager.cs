@@ -1,3 +1,4 @@
+using LightSwitchSystem;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -6,7 +7,19 @@ namespace MissionSystem
 {
     public class MissionManager : MonoBehaviour
     {
-        static public MissionManager Instance { get; private set; }
+        private static MissionManager instance;
+        
+        public static MissionManager Instance
+        {
+            get
+            {
+                if (instance == null)
+                {
+                    instance = FindObjectOfType<MissionManager>();
+                }
+                return instance;
+            }
+        }
 
         [Header("Runtime")]
         [SerializeField] List<Mission> missions = new();
@@ -26,13 +39,13 @@ namespace MissionSystem
         #region Unity Methods
         private void Awake()
         {
-            if (Instance != null)
+            if (Instance != null && Instance != this)
             {
                 Debug.LogError("Multiple instances of MissionManager detected. Destroying Self");
                 Destroy(gameObject);
                 return;
             }
-            Instance = this;
+            instance = this;
         }
         #endregion
 

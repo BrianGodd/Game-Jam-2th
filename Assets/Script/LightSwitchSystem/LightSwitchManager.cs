@@ -16,10 +16,6 @@ namespace LightSwitchSystem
                 }
                 return instance;
             }
-            set
-            {
-                instance = value;
-            }
         }
 
         [SerializeField] private List<LightSwitch> lightSwitches = new();
@@ -34,7 +30,7 @@ namespace LightSwitchSystem
                 return;
             }
 
-            Instance = this;
+            instance = this;
         }
 
         private void Start()
@@ -46,7 +42,7 @@ namespace LightSwitchSystem
         {
             if (Instance == this)
             {
-                Instance = null;
+                instance = null;
             }
         }
 
