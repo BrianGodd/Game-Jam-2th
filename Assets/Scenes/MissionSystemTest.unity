@@ -431,6 +431,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1853015240}
   - component: {fileID: 1853015239}
+  - component: {fileID: 1853015241}
   m_Layer: 0
   m_Name: GameObject
   m_TagString: Untagged
@@ -450,6 +451,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8aae034d847e4fd4cb7fef2219ee4a94, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  missions: []
+  doBroadcastMissionCount: 1
 --- !u!4 &1853015240
 Transform:
   m_ObjectHideFlags: 0
@@ -465,6 +468,20 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1853015241
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1853015238}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2e1d5509313a1874980ca9293bc43218, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  gameLengthMinutes: 0.1
+  timeCompleteness: 0
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
