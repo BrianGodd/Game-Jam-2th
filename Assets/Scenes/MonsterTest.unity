@@ -951,7 +951,7 @@ GameObject:
   - component: {fileID: 910000001}
   - component: {fileID: 910000002}
   m_Layer: 0
-  m_Name: Monster Presence Director
+  m_Name: MonsterManager
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1006,10 +1006,12 @@ MonoBehaviour:
   moveSpeed: 3
   vanishWhenLookedAt: 1
   threat: 0
-  threatThreshold: 5
-  threatIncreaseRate: 1
+  threatThreshold: 20
+  walkThreatRate: 1
+  runThreatRate: 5
+  threatDecayRate: 0.5
   chaseChance: 1
-  soundDetectionThreshold: 75
+  soundDetectionThreshold: 50
   initialChaseSpeed: 8
   finalChaseSpeed: 2
   speedDecayDuration: 5

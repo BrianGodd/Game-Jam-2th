@@ -22,11 +22,14 @@ namespace Horror
         public float maxStalkDistance = 18f;
         public float moveSpeed = 2f;
         public bool vanishWhenLookedAt = true;
+        public float sightRange = 20f;
 
         [Header("Threat Settings")]
         public float threat = 0f;
         public float threatThreshold = 50f;
-        public float threatIncreaseRate = 2f;
+        public float walkThreatRate = 8f;
+        public float runThreatRate = 20f;
+        public float threatDecayRate = 4f;
         [Range(0f, 1f)]
         public float chaseChance = 0.5f;
         public float soundDetectionThreshold = 75f;
@@ -108,7 +111,35 @@ namespace Horror
 
         private void Update()
         {
-            threat += Time.deltaTime * threatIncreaseRate;
+            // Calculate player movement state
+            bool isMoving = false;
+            bool isRunning = false;
+
+            var inputs = playerController.GetComponent<StarterAssets.StarterAssetsInputs>();
+            var cc = playerController.GetComponent<CharacterController>();
+            if (inputs != null && cc != null)
+            {
+                if (playerController.Grounded && inputs.move.sqrMagnitude > 0.01f && cc.velocity.sqrMagnitude > 0.01f)
+                {
+                    isMoving = true;
+                    isRunning = inputs.sprint;
+                }
+            }
+
+            // Update Threat based on movement (bypass during Chase/Jumpscare/Search to allow proper state behaviors)
+            if (state != MonsterState.Chasing && state != MonsterState.Searching && state != MonsterState.Jumpscare)
+            {
+                if (isMoving)
+                {
+                    float increaseRate = isRunning ? runThreatRate : walkThreatRate;
+                    threat += Time.deltaTime * increaseRate;
+                }
+                else
+                {
+                    threat -= Time.deltaTime * threatDecayRate;
+                }
+                threat = Mathf.Clamp(threat, 0f, 100f);
+            }
 
             if (state == MonsterState.Hidden)
             {
@@ -415,6 +446,12 @@ namespace Horror
 
         private bool CanSeePlayer()
         {
+            float dist = Vector3.Distance(monsterObject.transform.position, playerCamera.transform.position);
+            if (dist > sightRange)
+            {
+                return false;
+            }
+
             Vector3 start = monsterObject.transform.position + Vector3.up * 1.5f;
             Vector3 end = playerCamera.transform.position;
 
