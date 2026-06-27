@@ -1,0 +1,544 @@
+# Unity Post-Processing Implementation Spec
+# Target style: It Steals-like low-resolution horror monitor look
+
+## Goal
+Implement a Unity post-processing effect that recreates the visual style of It Steals:
+low-resolution pixelated rendering, posterized color bands, crushed dark shadows, cold blue/cyan grading,
+subtle dirty noise/dithering, vignette, and optional low-quality bloom/glow.
+
+The goal is NOT a cartoon/toon outline shader.
+The goal is to destroy visual information in a controlled way so dark areas become hard to read.
+The final image should feel like a broken surveillance camera / old horror game / flashlight footage.
+
+---
+
+## Recommended Unity target
+Use a full-screen post-processing pass.
+
+Preferred implementation options:
+
+1. HDRP Custom Post Process / Custom Pass
+2. URP ScriptableRendererFeature + full-screen blit pass
+3. Built-in pipeline OnRenderImage fallback
+
+If the project is HDRP, implement as a Custom Post Process Volume component.
+If the project is URP, implement as a ScriptableRendererFeature.
+
+The shader should be a full-screen shader that samples the rendered scene texture.
+
+---
+
+## Required effect stack
+The post-processing effect should apply these steps in order:
+
+1. Sample scene color with pixelated UVs
+2. Apply cold blue horror color grading
+3. Crush black levels and increase contrast
+4. Posterize / quantize color or luminance
+5. Add subtle noise or dithering
+6. Apply vignette
+7. Optional: add low-resolution bloom/glow for bright areas
+
+Recommended order:
+
+Scene Color
+  -> Pixelated sampling
+  -> Color grading
+  -> Shadow crush / contrast
+  -> Posterization
+  -> Noise / dithering
+  -> Vignette
+  -> Output
+
+Optional bloom can be done either before or after posterization.
+For a blockier horror look, apply bloom at low resolution and composite before the final posterization/noise.
+
+---
+
+## Exposed parameters
+Create a MonoBehaviour / Volume Component with the following parameters:
+
+pixelResolutionX: int, default 320, range 160 to 640
+pixelResolutionY: int, default 180, range 90 to 360
+posterizeSteps: float, default 7, range 3 to 16
+contrast: float, default 1.35, range 0.8 to 3.0
+blackCrush: float, default 0.035, range 0.0 to 0.2
+gamma: float, default 1.25, range 0.5 to 2.5
+blueTintStrength: float, default 0.75, range 0.0 to 1.0
+noiseStrength: float, default 0.02, range 0.0 to 0.1
+vignetteStrength: float, default 0.55, range 0.0 to 1.0
+vignetteRadius: float, default 0.85, range 0.1 to 1.5
+bloomStrength: float, default 0.15, range 0.0 to 2.0
+bloomThreshold: float, default 0.65, range 0.0 to 2.0
+
+Also expose:
+
+useLumaPosterize: bool, default true
+useAnimatedNoise: bool, default true
+
+---
+
+## Shader logic overview
+
+### 1. Pixelated sampling
+Instead of sampling the scene at the original UV, snap the UV to a virtual low-resolution grid.
+Use point-like sampling behavior.
+
+Pseudo-HLSL:
+
+float2 pixelCount = float2(_PixelResolutionX, _PixelResolutionY);
+float2 pixelUV = floor(input.uv * pixelCount) / pixelCount;
+float3 color = SAMPLE_SCENE_COLOR(pixelUV).rgb;
+
+This is the most important part of the look.
+The result should look like the 3D scene was rendered at a low resolution and enlarged.
+
+Recommended starting values:
+_PixelResolutionX = 320
+_PixelResolutionY = 180
+
+For a stronger effect:
+256 x 144
+
+For a softer effect:
+426 x 240
+
+---
+
+### 2. Cold blue/cyan horror grading
+Push shadows toward dark navy and highlights toward cyan/blue.
+Do not simply multiply the entire image by blue, otherwise it becomes flat.
+Use luminance to blend between shadow, midtone, and highlight tints.
+
+Pseudo-HLSL:
+
+float luma = dot(color, float3(0.299, 0.587, 0.114));
+
+float3 shadowTint = float3(0.02, 0.035, 0.08);
+float3 midTint    = float3(0.12, 0.22, 0.45);
+float3 highTint   = float3(0.55, 0.85, 1.00);
+
+float3 graded = color;
+graded *= lerp(shadowTint, midTint, smoothstep(0.02, 0.45, luma)) * 1.8;
+graded = lerp(graded, graded * highTint * 1.25, smoothstep(0.45, 1.0, luma));
+
+color = lerp(color, graded, _BlueTintStrength);
+
+Target feeling:
+- shadows become blue-black
+- flashlight highlights become icy blue/cyan
+- warm colors remain slightly visible but subdued
+
+---
+
+### 3. Black crush and contrast
+Push low values into near-black and increase contrast.
+This creates the feeling that information is being eaten by darkness.
+
+Pseudo-HLSL:
+
+color = saturate((color - _BlackCrush) * _Contrast);
+color = pow(max(color, 0.0001), _Gamma);
+
+Recommended values:
+_BlackCrush = 0.03 to 0.06
+_Contrast = 1.2 to 1.7
+_Gamma = 1.1 to 1.5
+
+Important:
+Do not make everything black. Keep flashlight/bright regions readable.
+The darkness should erase mid/low details while preserving high contrast shapes.
+
+---
+
+### 4. Posterization / color quantization
+Quantize the image to a small number of brightness/color steps.
+This creates chunky bands on floor reflections and surfaces.
+
+Option A: RGB posterization
+This is simpler and more aggressive.
+
+float steps = max(_PosterizeSteps, 2.0);
+color = floor(color * steps) / steps;
+
+Option B: luminance-preserving posterization
+This usually looks better because it preserves hue better.
+
+float luma = dot(color, float3(0.299, 0.587, 0.114));
+float q = floor(luma * steps) / steps;
+color *= q / max(luma, 0.001);
+color = saturate(color);
+
+Implementation requirement:
+Support both modes using _UseLumaPosterize.
+Default to luminance posterization.
+
+Recommended steps:
+5 to 8 for strong horror look
+8 to 12 for cleaner PS1-ish look
+
+---
+
+### 5. Noise / dithering
+Add subtle noise after posterization so the image does not look too clean.
+This should be low strength, not a snowstorm.
+
+Pseudo-HLSL hash noise:
+
+float Hash21(float2 p)
+{
+    p = frac(p * float2(123.34, 456.21));
+    p += dot(p, p + 45.32);
+    return frac(p.x * p.y);
+}
+
+float2 noiseUV = input.uv * _ScreenParams.xy;
+if (_UseAnimatedNoise > 0.5)
+{
+    noiseUV += _Time.y * 60.0;
+}
+
+float n = Hash21(floor(noiseUV));
+color += (n - 0.5) * _NoiseStrength;
+color = saturate(color);
+
+Recommended values:
+_NoiseStrength = 0.01 to 0.035
+
+Optional improvement:
+Use ordered dithering / Bayer matrix instead of random hash noise if a more retro/structured look is desired.
+
+---
+
+### 6. Vignette
+Darken screen edges heavily to tunnel the player's vision.
+
+Pseudo-HLSL:
+
+float2 centered = input.uv * 2.0 - 1.0;
+float dist = dot(centered, centered);
+float vignette = smoothstep(_VignetteRadius, _VignetteRadius - _VignetteStrength, dist);
+color *= vignette;
+
+Alternative safer version:
+
+float2 centered = input.uv - 0.5;
+float dist = length(centered);
+float vig = smoothstep(_VignetteRadius, _VignetteRadius - _VignetteStrength, dist);
+color *= vig;
+
+Recommended values:
+_VignetteRadius = 0.75 to 1.0
+_VignetteStrength = 0.35 to 0.75
+
+---
+
+## Optional low-resolution bloom/glow
+The screenshot has a rough blue glow around bright flashlight-like regions.
+This can be approximated in one pass cheaply, or properly using downsample/blur/composite.
+
+### Simple one-pass fake bloom
+Sample nearby pixels around the pixelated UV and only keep bright values.
+
+Pseudo-HLSL:
+
+float3 bloom = 0;
+float2 texel = 1.0 / float2(_PixelResolutionX, _PixelResolutionY);
+
+for each offset in small cross pattern:
+    float3 s = SAMPLE_SCENE_COLOR(pixelUV + offset * texel).rgb;
+    float brightness = max(max(s.r, s.g), s.b);
+    bloom += max(s - _BloomThreshold, 0.0);
+
+bloom /= sampleCount;
+color += bloom * _BloomStrength * float3(0.5, 0.8, 1.0);
+
+Keep bloom subtle.
+Recommended:
+_BloomStrength = 0.05 to 0.25
+_BloomThreshold = 0.55 to 0.8
+
+### Better bloom
+Use a temporary low-resolution render target:
+1. Extract bright pixels
+2. Downsample
+3. Blur horizontally/vertically or use Kawase blur
+4. Composite back before final posterization
+
+For this style, low-quality bloom is acceptable and may look better than clean modern bloom.
+
+---
+
+## Full pseudo-HLSL fragment
+
+float4 Frag(Varyings input) : SV_Target
+{
+    float2 uv = input.uv;
+
+    // Pixelate
+    float2 pixelCount = float2(_PixelResolutionX, _PixelResolutionY);
+    float2 pixelUV = floor(uv * pixelCount) / pixelCount;
+
+    float3 color = SampleSceneColor(pixelUV).rgb;
+
+    // Optional fake bloom from original scene color
+    float3 bloom = 0.0;
+    if (_BloomStrength > 0.001)
+    {
+        float2 texel = 1.0 / pixelCount;
+        float2 offsets[8] = {
+            float2( 1, 0), float2(-1, 0), float2(0,  1), float2(0, -1),
+            float2( 1, 1), float2(-1, 1), float2(1, -1), float2(-1,-1)
+        };
+
+        for (int i = 0; i < 8; i++)
+        {
+            float3 s = SampleSceneColor(pixelUV + offsets[i] * texel * 2.0).rgb;
+            bloom += max(s - _BloomThreshold, 0.0);
+        }
+        bloom /= 8.0;
+    }
+
+    // Luminance
+    float luma = dot(color, float3(0.299, 0.587, 0.114));
+
+    // Blue horror grading
+    float3 shadowTint = float3(0.02, 0.035, 0.08);
+    float3 midTint    = float3(0.12, 0.22, 0.45);
+    float3 highTint   = float3(0.55, 0.85, 1.00);
+
+    float3 graded = color;
+    graded *= lerp(shadowTint, midTint, smoothstep(0.02, 0.45, luma)) * 1.8;
+    graded = lerp(graded, graded * highTint * 1.25, smoothstep(0.45, 1.0, luma));
+    color = lerp(color, graded, _BlueTintStrength);
+
+    // Add blue bloom/glow
+    color += bloom * _BloomStrength * float3(0.5, 0.8, 1.0);
+
+    // Black crush and contrast
+    color = saturate((color - _BlackCrush) * _Contrast);
+    color = pow(max(color, 0.0001), _Gamma);
+
+    // Posterize
+    float steps = max(_PosterizeSteps, 2.0);
+    if (_UseLumaPosterize > 0.5)
+    {
+        float lum = dot(color, float3(0.299, 0.587, 0.114));
+        float q = floor(lum * steps) / steps;
+        color *= q / max(lum, 0.001);
+    }
+    else
+    {
+        color = floor(color * steps) / steps;
+    }
+    color = saturate(color);
+
+    // Noise
+    float2 noiseUV = uv * _ScreenParams.xy;
+    if (_UseAnimatedNoise > 0.5)
+    {
+        noiseUV += _Time.y * 60.0;
+    }
+    float n = Hash21(floor(noiseUV));
+    color += (n - 0.5) * _NoiseStrength;
+    color = saturate(color);
+
+    // Vignette
+    float2 centered = uv - 0.5;
+    float dist = length(centered);
+    float vig = smoothstep(_VignetteRadius, _VignetteRadius - _VignetteStrength, dist);
+    color *= vig;
+
+    return float4(color, 1.0);
+}
+
+---
+
+## HDRP implementation notes
+
+If implementing in HDRP:
+
+Create a Custom Post Process Volume component, for example:
+
+ItStealsHorrorPostProcess.cs
+ItStealsHorrorPostProcess.shader
+
+The C# component should:
+1. Inherit from CustomPostProcessVolumeComponent
+2. Implement IPostProcessComponent
+3. Load the shader by name
+4. Create a material
+5. Set all exposed parameters on the material
+6. Call HDUtils.DrawFullScreen or the equivalent full-screen draw method
+
+Use injection point:
+AfterPostProcess, or BeforePostProcess depending on desired interaction with HDRP bloom.
+
+Recommended:
+- If using custom fake bloom in this effect: inject AfterPostProcess
+- If relying on HDRP bloom: inject BeforePostProcess, then let HDRP bloom process the pixelated image
+
+For this specific style, custom fake low-res bloom is preferred.
+
+---
+
+## URP implementation notes
+
+If implementing in URP:
+
+Create:
+
+ItStealsHorrorRendererFeature.cs
+ItStealsHorrorPass.cs
+ItStealsHorrorPostProcess.shader
+
+The RendererFeature should:
+1. Create a ScriptableRenderPass
+2. Set renderPassEvent to AfterRenderingPostProcessing or BeforeRenderingPostProcessing
+3. Blit camera color target into a temporary RT using the material
+4. Blit result back to camera color target
+
+Recommended renderPassEvent:
+AfterRenderingPostProcessing
+
+If the project uses URP 14+ / Unity 6 RenderGraph APIs, adapt to the current URP blit pattern.
+
+---
+
+## Built-in pipeline fallback
+
+Use OnRenderImage:
+
+void OnRenderImage(RenderTexture src, RenderTexture dst)
+{
+    if (material == null)
+    {
+        Graphics.Blit(src, dst);
+        return;
+    }
+
+    material.SetFloat("_PixelResolutionX", pixelResolutionX);
+    material.SetFloat("_PixelResolutionY", pixelResolutionY);
+    ...
+
+    Graphics.Blit(src, dst, material);
+}
+
+This is the simplest proof-of-concept path.
+
+---
+
+## Tuning presets
+
+### Preset A: It Steals-ish default
+pixelResolutionX = 320
+pixelResolutionY = 180
+posterizeSteps = 7
+contrast = 1.35
+blackCrush = 0.035
+gamma = 1.25
+blueTintStrength = 0.75
+noiseStrength = 0.02
+vignetteStrength = 0.55
+vignetteRadius = 0.85
+bloomStrength = 0.15
+bloomThreshold = 0.65
+useLumaPosterize = true
+useAnimatedNoise = true
+
+### Preset B: more extreme horror
+pixelResolutionX = 256
+pixelResolutionY = 144
+posterizeSteps = 5
+contrast = 1.6
+blackCrush = 0.055
+gamma = 1.4
+blueTintStrength = 0.9
+noiseStrength = 0.03
+vignetteStrength = 0.75
+vignetteRadius = 0.8
+bloomStrength = 0.2
+bloomThreshold = 0.6
+useLumaPosterize = true
+useAnimatedNoise = true
+
+### Preset C: cleaner retro low-res
+pixelResolutionX = 426
+pixelResolutionY = 240
+posterizeSteps = 10
+contrast = 1.15
+blackCrush = 0.02
+gamma = 1.1
+blueTintStrength = 0.55
+noiseStrength = 0.01
+vignetteStrength = 0.35
+vignetteRadius = 0.95
+bloomStrength = 0.08
+bloomThreshold = 0.75
+useLumaPosterize = true
+useAnimatedNoise = false
+
+---
+
+## Important visual notes
+
+1. Do not add strong Sobel outlines by default.
+This style is not primarily an outline/toon effect.
+It relies on missing information, crushed shadows, and low-resolution shape ambiguity.
+
+2. Do not make the image too bright.
+The center flashlight/highlight area should read clearly, but most background areas should be barely readable.
+
+3. Pixelation should happen through UV snapping or low-resolution render target.
+Do not use smooth bilinear upscaling.
+The final image should have hard blocky edges.
+
+4. Posterization should be visible in lit surfaces.
+The floor and wall lighting should break into chunky bands.
+
+5. Noise should be subtle.
+It should dirty the image, not cover it.
+
+6. Bloom should be rough and blue.
+Avoid clean cinematic bloom.
+Low-resolution glow fits the horror monitor look better.
+
+---
+
+## Deliverables expected from Codex
+
+Please generate the following Unity files:
+
+For HDRP:
+- Assets/Scripts/PostProcessing/ItStealsHorrorPostProcess.cs
+- Assets/Shaders/PostProcessing/ItStealsHorrorPostProcess.shader
+
+For URP:
+- Assets/Scripts/PostProcessing/ItStealsHorrorRendererFeature.cs
+- Assets/Shaders/PostProcessing/ItStealsHorrorPostProcess.shader
+
+If pipeline is unknown, implement the Built-in OnRenderImage version first as a simple working prototype:
+- Assets/Scripts/PostProcessing/ItStealsHorrorEffect.cs
+- Assets/Shaders/PostProcessing/ItStealsHorrorPostProcess.shader
+
+The implementation should expose all parameters in the Inspector.
+The shader should compile without external packages except the selected Unity render pipeline.
+The default settings should immediately produce a dark, blue, pixelated horror look.
+
+---
+
+## Testing checklist
+
+After implementation:
+
+1. Add the effect to the camera or post-process volume.
+2. Enter Play Mode.
+3. Confirm the scene is visibly pixelated.
+4. Confirm dark areas are crushed toward blue-black.
+5. Confirm lit areas posterize into visible bands.
+6. Confirm noise is visible but subtle.
+7. Confirm vignette darkens screen edges.
+8. Move the camera and check that the pixelation remains stable.
+9. Test with a flashlight or bright emissive object.
+10. Adjust presets until the image resembles a low-resolution horror surveillance camera.
+

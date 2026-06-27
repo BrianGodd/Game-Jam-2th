@@ -1,0 +1,71 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &-2810900801591781687
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f5b14b8e226c5ea429d8a44e038ab168, type: 3}
+  m_Name: ItStealsHorrorVolume
+  m_EditorClassIdentifier: 
+  active: 1
+  pixelResolutionX:
+    m_OverrideState: 1
+    m_Value: 305
+  pixelResolutionY:
+    m_OverrideState: 1
+    m_Value: 219
+  posterizeSteps:
+    m_OverrideState: 1
+    m_Value: 14
+  contrast:
+    m_OverrideState: 1
+    m_Value: 3
+  blackCrush:
+    m_OverrideState: 1
+    m_Value: 0.009
+  gamma:
+    m_OverrideState: 1
+    m_Value: 0.71
+  blueTintStrength:
+    m_OverrideState: 1
+    m_Value: 0
+  noiseStrength:
+    m_OverrideState: 1
+    m_Value: 0.0208
+  vignetteStrength:
+    m_OverrideState: 1
+    m_Value: 0.932
+  vignetteRadius:
+    m_OverrideState: 1
+    m_Value: 0.728
+  bloomStrength:
+    m_OverrideState: 0
+    m_Value: 0
+  bloomThreshold:
+    m_OverrideState: 0
+    m_Value: 0
+  useLumaPosterize:
+    m_OverrideState: 1
+    m_Value: 1
+  useAnimatedNoise:
+    m_OverrideState: 1
+    m_Value: 1
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d7fd9488000d3734a9e00ee676215985, type: 3}
+  m_Name: Global Volume Profile
+  m_EditorClassIdentifier: 
+  components:
+  - {fileID: -2810900801591781687}
