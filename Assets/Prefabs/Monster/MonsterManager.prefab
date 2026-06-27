@@ -87,6 +87,9 @@ MonoBehaviour:
   jumpscareAudioSource: {fileID: 0}
   jumpscareClip: {fileID: 0}
   jumpscareDuration: 2.5
+  jumpscareHeightOffset: 0
+  jumpscareShakeIntensity: 3
+  jumpscarePositionalShake: 0.05
 --- !u!114 &8032852224277358888
 MonoBehaviour:
   m_ObjectHideFlags: 0
