@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.AI;
 using UnityEngine.InputSystem;
+using Cinemachine;
 
 namespace Horror
 {
@@ -52,6 +53,11 @@ namespace Horror
         public AudioSource jumpscareAudioSource;
         public AudioClip jumpscareClip;
         public float jumpscareDuration = 2.5f;
+        public float jumpscareHeightOffset = -0.5f;
+        public float jumpscareShakeIntensity = 3.0f; // maximum rotation shake in degrees
+        public float jumpscarePositionalShake = 0.05f; // maximum position shake offset in meters
+
+        private Vector3 jumpscareCameraBaseLocalPos;
 
         private enum MonsterState
         {
@@ -326,7 +332,27 @@ namespace Horror
                     break;
 
                 case MonsterState.Jumpscare:
-                    playerCamera.transform.LookAt(monsterObject.transform.position + Vector3.up * 1.5f);
+                    // Apply random positional shake relative to cached base local position
+                    Vector3 randomOffset = new Vector3(
+                        Random.Range(-jumpscarePositionalShake, jumpscarePositionalShake),
+                        Random.Range(-jumpscarePositionalShake, jumpscarePositionalShake),
+                        Random.Range(-jumpscarePositionalShake, jumpscarePositionalShake)
+                    );
+                    playerCamera.transform.localPosition = jumpscareCameraBaseLocalPos + randomOffset;
+
+                    // Apply rotational shake on top of looking at monster's face
+                    Vector3 lookTarget = monsterObject.transform.position + Vector3.up * 1.5f;
+                    Vector3 lookDir = (lookTarget - playerCamera.transform.position).normalized;
+                    if (lookDir.sqrMagnitude > 0.001f)
+                    {
+                        Quaternion baseRot = Quaternion.LookRotation(lookDir);
+                        Quaternion shakeRot = Quaternion.Euler(
+                            Random.Range(-jumpscareShakeIntensity, jumpscareShakeIntensity),
+                            Random.Range(-jumpscareShakeIntensity, jumpscareShakeIntensity),
+                            Random.Range(-jumpscareShakeIntensity, jumpscareShakeIntensity)
+                        );
+                        playerCamera.transform.rotation = baseRot * shakeRot;
+                    }
 
                     if (Time.time >= jumpscareEndTime)
                     {
@@ -409,6 +435,16 @@ namespace Horror
             jumpscareEndTime = Time.time + jumpscareDuration;
             Debug.LogWarning($"[Monster] JUMPSCARE triggered! Caught player!");
 
+            // Cache camera base local position to apply shakes without permanent drift
+            jumpscareCameraBaseLocalPos = playerCamera.transform.localPosition;
+
+            // Disable CinemachineBrain to allow manual camera control/shake
+            var brain = playerCamera.GetComponent<CinemachineBrain>();
+            if (brain != null)
+            {
+                brain.enabled = false;
+            }
+
             // Freeze player inputs and movement
             playerController.enabled = false;
 
@@ -432,7 +468,7 @@ namespace Horror
 
             // Position monster in front of camera
             Vector3 facePos = playerCamera.transform.position + playerCamera.transform.forward * 1.0f;
-            facePos.y = playerCamera.transform.position.y - 0.5f;
+            facePos.y = playerCamera.transform.position.y + jumpscareHeightOffset;
             monsterObject.transform.position = facePos;
             monsterObject.transform.LookAt(playerCamera.transform.position);
 
@@ -468,6 +504,27 @@ namespace Horror
             return true;
         }
 
+        private bool CanPlayerSeePoint(Vector3 pointPosition)
+        {
+            if (!IsInView(pointPosition))
+            {
+                return false;
+            }
+
+            Vector3 start = playerCamera.transform.position;
+            Vector3 end = pointPosition;
+            RaycastHit hit;
+            if (Physics.Linecast(start, end, out hit))
+            {
+                // If it hits an obstacle on the way to the point, sight is blocked
+                if (Vector3.Distance(hit.point, pointPosition) > 0.5f)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         private int PickValidPairIndex()
         {
             int numPoints = Mathf.Min(stalkPoints.Length, hidePoints.Length);
@@ -475,15 +532,19 @@ namespace Horror
             for (int i = 0; i < numPoints; i++)
             {
                 int index = (startIndex + i) % numPoints;
-                Transform point = stalkPoints[index];
-                float distance = Vector3.Distance(playerCamera.transform.position, point.position);
-                if (distance >= minStalkDistance && distance <= maxStalkDistance && !IsInView(point.position))
+                Transform hidePoint = hidePoints[index];
+                Transform stalkPoint = stalkPoints[index];
+                
+                float distance = Vector3.Distance(playerCamera.transform.position, stalkPoint.position);
+                
+                // HidePoint must NOT be visible to the player to prevent popping out of thin air
+                if (distance >= minStalkDistance && distance <= maxStalkDistance && !CanPlayerSeePoint(hidePoint.position))
                 {
                     return index;
                 }
             }
 
-            throw new System.InvalidOperationException("No stalk point is outside the camera view and within the configured distance range.");
+            throw new System.InvalidOperationException("No valid stalk point is within range, or all corresponding hide points are currently visible to the player.");
         }
 
         private void ScheduleNextSighting()
