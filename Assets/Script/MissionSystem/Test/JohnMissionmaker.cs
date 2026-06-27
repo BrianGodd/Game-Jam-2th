@@ -22,21 +22,4 @@ public class JohnMissionmaker : MonoBehaviour
     {
         myMission?.Complete();
     }
-
-    public void CheckMission()
-    {
-        if(MissionManager.Instance.HasIncompleteMission)
-        {
-            Debug.Log("O: Incomplete missions.");
-        }
-        else
-        {
-            Debug.Log("X: No incomplete missions.");
-        }
-    }
-
-    public void Start()
-    {
-        InvokeRepeating(nameof(CheckMission), 1f, 2f);
-    }
 }
