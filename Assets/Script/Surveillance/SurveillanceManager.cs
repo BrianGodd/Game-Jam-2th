@@ -6,20 +6,20 @@ namespace Surveillance
 {
     public class SurveillanceManager : MonoBehaviour
     {
-        private static SurveillanceManager m_Instance;
+        private static SurveillanceManager instance;
         public static SurveillanceManager Instance
         {
             get
             {
-                if (m_Instance == null)
+                if (instance == null)
                 {
-                    m_Instance = FindObjectOfType<SurveillanceManager>();
+                    instance = FindObjectOfType<SurveillanceManager>();
                 }
-                return m_Instance;
+                return instance;
             }
             set
             {
-                m_Instance = value;
+                instance = value;
             }
         }
 
