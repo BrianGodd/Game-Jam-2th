@@ -107,5 +107,6 @@ InitTestScene*.unity*
 /[Aa]ssets/[Ii]nit[Tt]est[Ss]cene*.unity*
 
 /.vsconfig
+/.github/copilot-instructions.md
 .vscode
 .idea
