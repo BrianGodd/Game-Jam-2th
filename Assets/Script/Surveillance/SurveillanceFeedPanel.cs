@@ -1,6 +1,9 @@
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 namespace Surveillance
 {
@@ -9,24 +12,37 @@ namespace Surveillance
         [SerializeField] private RawImage feedImage;
         [SerializeField] private TMP_Text cameraLabel;
 
+#if ENABLE_INPUT_SYSTEM
+        [SerializeField] private InputActionReference shiftLeftAction;
+        [SerializeField] private InputActionReference shiftRightAction;
+        private InputAction leftRuntimeAction;
+        private InputAction rightRuntimeAction;
+#endif
+
         private void OnEnable()
         {
-            var manager = SurveillanceManager.Instance;
-            if (manager == null)
-            {
-                Debug.LogError("SurveillanceManager instance is not available. Please ensure that a SurveillanceManager is present in the scene.");
-            }
-            SurveillanceManager.Instance.ActiveCameraChanged += OnActiveCameraChanged;
-            feedImage.texture = SurveillanceManager.Instance.FeedTexture;
-            RefreshDisplay(SurveillanceManager.Instance.CurrentCamera);
+            SurveillanceManager manager = SurveillanceManager.Instance;
+            manager.ActiveCameraChanged += OnActiveCameraChanged;
+            feedImage.texture = manager.FeedTexture;
+            RefreshDisplay(manager.CurrentCamera);
+
+#if ENABLE_INPUT_SYSTEM
+            BindShiftAction(ref leftRuntimeAction, shiftLeftAction, "SurveillanceLeft", OnShiftLeftPerformed);
+            BindShiftAction(ref rightRuntimeAction, shiftRightAction, "SurveillanceRight", OnShiftRightPerformed);
+#endif
         }
 
         private void OnDisable()
         {
-            if(SurveillanceManager.Instance != null)
+            if (SurveillanceManager.Instance != null)
             {
                 SurveillanceManager.Instance.ActiveCameraChanged -= OnActiveCameraChanged;
             }
+
+#if ENABLE_INPUT_SYSTEM
+            UnbindShiftAction(ref leftRuntimeAction, OnShiftLeftPerformed);
+            UnbindShiftAction(ref rightRuntimeAction, OnShiftRightPerformed);
+#endif
         }
 
         [ContextMenu("Shift Left")]
@@ -53,5 +69,57 @@ namespace Surveillance
                 cameraLabel.text = camera != null ? camera.CameraLabel : "No Signal";
             }
         }
+
+#if ENABLE_INPUT_SYSTEM
+        private void BindShiftAction(
+            ref InputAction runtimeAction,
+            InputActionReference actionReference,
+            string fallbackActionName,
+            System.Action<InputAction.CallbackContext> performedCallback)
+        {
+            if (actionReference != null && actionReference.action != null)
+            {
+                runtimeAction = actionReference.action;
+            }
+            else if (TryGetComponent<PlayerInput>(out var playerInput) && playerInput.actions != null)
+            {
+                runtimeAction = playerInput.actions.FindAction(fallbackActionName, false);
+            }
+
+            if (runtimeAction == null)
+            {
+                return;
+            }
+
+            runtimeAction.performed += performedCallback;
+            if (!runtimeAction.enabled)
+            {
+                runtimeAction.Enable();
+            }
+        }
+
+        private void UnbindShiftAction(
+            ref InputAction runtimeAction,
+            System.Action<InputAction.CallbackContext> performedCallback)
+        {
+            if (runtimeAction == null)
+            {
+                return;
+            }
+
+            runtimeAction.performed -= performedCallback;
+            runtimeAction = null;
+        }
+
+        private void OnShiftLeftPerformed(InputAction.CallbackContext ctx)
+        {
+            ShiftLeft();
+        }
+
+        private void OnShiftRightPerformed(InputAction.CallbackContext ctx)
+        {
+            ShiftRight();
+        }
+#endif
     }
 }
