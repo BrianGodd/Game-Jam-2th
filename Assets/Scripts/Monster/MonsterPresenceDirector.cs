@@ -22,13 +22,17 @@ namespace Horror
         public float maxStalkDistance = 18f;
         public float moveSpeed = 2f;
         public bool vanishWhenLookedAt = true;
+        public float sightRange = 20f;
 
         [Header("Threat Settings")]
         public float threat = 0f;
         public float threatThreshold = 50f;
-        public float threatIncreaseRate = 2f;
+        public float walkThreatRate = 8f;
+        public float runThreatRate = 20f;
+        public float threatDecayRate = 4f;
         [Range(0f, 1f)]
         public float chaseChance = 0.5f;
+        public float soundDetectionThreshold = 75f;
 
         [Header("Chase Settings")]
         public float initialChaseSpeed = 8f;
@@ -37,6 +41,8 @@ namespace Horror
         public float attackDistance = 1.5f;
         public float loseDistance = 20f;
         public float chaseGracePeriod = 3f;
+        public float searchDuration = 4f;
+        public float searchExtraDistance = 2f;
 
         [Header("Escape Settings")]
         public float escapeDistance = 8f;
@@ -54,6 +60,7 @@ namespace Horror
             Stalking,
             MovingToHide,
             Chasing,
+            Searching,
             BackingAway,
             Jumpscare
         }
@@ -64,6 +71,10 @@ namespace Horror
         private float chaseStartTime;
         private float escapeEndTime;
         private float jumpscareEndTime;
+        private float searchEndTime;
+        private float searchCenterYaw;
+        private float stateEnterTime;
+        private Vector3 lastSeenPosition;
         private Transform targetPoint;
         private int currentPairIndex = -1;
         private NavMeshAgent agent;
@@ -94,12 +105,41 @@ namespace Horror
             monsterObject.transform.SetPositionAndRotation(targetPoint.position, targetPoint.rotation);
             monsterObject.SetActive(false);
             state = MonsterState.Hidden;
+            stateEnterTime = Time.time;
             nextSightingTime = Time.time + firstDelay;
         }
 
         private void Update()
         {
-            threat += Time.deltaTime * threatIncreaseRate;
+            // Calculate player movement state
+            bool isMoving = false;
+            bool isRunning = false;
+
+            var inputs = playerController.GetComponent<StarterAssets.StarterAssetsInputs>();
+            var cc = playerController.GetComponent<CharacterController>();
+            if (inputs != null && cc != null)
+            {
+                if (playerController.Grounded && inputs.move.sqrMagnitude > 0.01f && cc.velocity.sqrMagnitude > 0.01f)
+                {
+                    isMoving = true;
+                    isRunning = inputs.sprint;
+                }
+            }
+
+            // Update Threat based on movement (bypass during Chase/Jumpscare/Search to allow proper state behaviors)
+            if (state != MonsterState.Chasing && state != MonsterState.Searching && state != MonsterState.Jumpscare)
+            {
+                if (isMoving)
+                {
+                    float increaseRate = isRunning ? runThreatRate : walkThreatRate;
+                    threat += Time.deltaTime * increaseRate;
+                }
+                else
+                {
+                    threat -= Time.deltaTime * threatDecayRate;
+                }
+                threat = Mathf.Clamp(threat, 0f, 100f);
+            }
 
             if (state == MonsterState.Hidden)
             {
@@ -110,7 +150,11 @@ namespace Horror
                 return;
             }
 
-            FacePlayer();
+            // Only face the player when not searching or in jumpscare
+            if (state != MonsterState.Searching && state != MonsterState.Jumpscare)
+            {
+                FacePlayer();
+            }
 
             switch (state)
             {
@@ -119,40 +163,47 @@ namespace Horror
                     // Check dynamic chase trigger
                     if (threat >= threatThreshold && Random.value < chaseChance * Time.deltaTime)
                     {
+                        Debug.Log($"[Monster] Dynamic trigger: Threat high ({threat:F1}). Transitioning to CHASE!");
                         StartChasing();
                         return;
                     }
                     // Check dynamic retreat trigger
                     if (ShouldVanishNow())
                     {
+                        Debug.Log($"[Monster] Spotted by player! Retreating to HidePoint[{currentPairIndex}].");
                         Retreat();
                         return;
                     }
 
                     if (state == MonsterState.MovingToStalk)
                     {
-                        if (HasReachedTarget())
+                        if (HasReachedPosition(targetPoint.position))
                         {
                             state = MonsterState.Stalking;
+                            stateEnterTime = Time.time;
                             hideTime = Time.time + stayDuration;
                             agent.ResetPath();
+                            Debug.Log($"[Monster] Reached StalkPoint. Standing still for {stayDuration}s...");
                         }
                     }
                     else // Stalking
                     {
                         if (Time.time >= hideTime)
                         {
+                            Debug.Log("[Monster] Stalk stay duration expired. Retreating.");
                             Retreat();
                         }
                     }
                     break;
 
                 case MonsterState.MovingToHide:
-                    if (HasReachedTarget())
+                    if (HasReachedPosition(targetPoint.position))
                     {
                         monsterObject.SetActive(false);
                         state = MonsterState.Hidden;
+                        stateEnterTime = Time.time;
                         ScheduleNextSighting();
+                        Debug.Log("[Monster] Reached HidePoint and vanished. Waiting for next appearance.");
                     }
                     break;
 
@@ -162,26 +213,115 @@ namespace Horror
                     float t = Mathf.Clamp01(elapsed / speedDecayDuration);
                     agent.speed = Mathf.Lerp(initialChaseSpeed, finalChaseSpeed, t);
 
-                    agent.destination = playerCamera.transform.position;
+                    // Check if player is detected (line of sight or noise)
+                    bool playerDetected = CanSeePlayer() || (threat >= soundDetectionThreshold);
+
+                    if (playerDetected)
+                    {
+                        Vector3 playerPos = playerCamera.transform.position;
+                        Vector3 chaseDir = (playerPos - monsterObject.transform.position).normalized;
+                        chaseDir.y = 0f;
+                        chaseDir = chaseDir.normalized;
+
+                        Vector3 targetPos = playerPos + chaseDir * searchExtraDistance;
+                        
+                        NavMeshHit navHit;
+                        if (NavMesh.SamplePosition(targetPos, out navHit, 4.0f, NavMesh.AllAreas))
+                        {
+                            lastSeenPosition = navHit.position;
+                        }
+                        else
+                        {
+                            lastSeenPosition = playerPos;
+                        }
+
+                        agent.destination = playerPos;
+                    }
 
                     float distance = Vector3.Distance(monsterObject.transform.position, playerCamera.transform.position);
                     if (distance <= attackDistance)
                     {
                         StartJumpscare();
+                        return;
                     }
-                    else if (elapsed >= chaseGracePeriod && distance >= loseDistance)
+
+                    if (!playerDetected)
+                    {
+                        StartSearching();
+                        return;
+                    }
+
+                    if (elapsed >= chaseGracePeriod && distance >= loseDistance)
                     {
                         threat = 0f;
                         StartBackingAway();
                     }
                     break;
 
+                case MonsterState.Searching:
+                    // Resume chase if player is detected again
+                    if (CanSeePlayer() || threat >= soundDetectionThreshold)
+                    {
+                        string reason = CanSeePlayer() ? "Player spotted" : $"Player too loud (Threat: {threat:F1} >= {soundDetectionThreshold:F1})";
+                        Debug.LogWarning($"[Monster] Player re-detected ({reason}) during search! Resuming CHASE!");
+                        StartChasing();
+                        return;
+                    }
+
+                    if (searchEndTime <= 0f)
+                    {
+                        // Rotate in movement direction
+                        if (!agent.pathPending && agent.velocity.sqrMagnitude > 0.01f)
+                        {
+                            Vector3 moveDir = agent.velocity.normalized;
+                            moveDir.y = 0f;
+                            if (moveDir.sqrMagnitude > 0.001f)
+                            {
+                                monsterObject.transform.rotation = Quaternion.LookRotation(moveDir, Vector3.up);
+                            }
+                        }
+
+                        if (HasReachedPosition(lastSeenPosition))
+                        {
+                            searchEndTime = Time.time + searchDuration;
+                            searchCenterYaw = monsterObject.transform.eulerAngles.y;
+                            agent.ResetPath();
+                            Debug.Log($"[Monster] Reached last seen position. Look-around started for {searchDuration}s...");
+                        }
+                    }
+                    else
+                    {
+                        // Look left and right at destination
+                        float angle = Mathf.Sin(Time.time * 3f) * 45f;
+                        monsterObject.transform.rotation = Quaternion.Euler(0f, searchCenterYaw + angle, 0f);
+
+                        if (Time.time >= searchEndTime)
+                        {
+                            threat = 0f;
+                            Debug.Log("[Monster] Look-around finished without finding player. Retreating.");
+                            Retreat();
+                        }
+                    }
+                    break;
+
                 case MonsterState.BackingAway:
-                    if (HasReachedTarget() || Time.time >= escapeEndTime)
+                    // If player gets close and is detected again during retreat, resume chase!
+                    float distToPlayer = Vector3.Distance(monsterObject.transform.position, playerCamera.transform.position);
+                    if (distToPlayer < loseDistance && (CanSeePlayer() || threat >= soundDetectionThreshold))
+                    {
+                        string reason = CanSeePlayer() ? "Player spotted" : $"Player too loud (Threat: {threat:F1} >= {soundDetectionThreshold:F1})";
+                        Debug.LogWarning($"[Monster] Player re-entered loseDistance ({distToPlayer:F1} < {loseDistance:F1}) and detected ({reason}) during retreat! Resuming CHASE!");
+                        StartChasing();
+                        return;
+                    }
+
+                    if (HasReachedPosition(agent.destination) || Time.time >= escapeEndTime)
                     {
                         monsterObject.SetActive(false);
                         state = MonsterState.Hidden;
+                        stateEnterTime = Time.time;
                         ScheduleNextSighting();
+                        Debug.Log("[Monster] Finished backing away and vanished.");
                     }
                     break;
 
@@ -190,6 +330,7 @@ namespace Horror
 
                     if (Time.time >= jumpscareEndTime)
                     {
+                        Debug.Log("[Monster] Jumpscare finished. Reloading scene...");
                         UnityEngine.SceneManagement.SceneManager.LoadScene(
                             UnityEngine.SceneManagement.SceneManager.GetActiveScene().name
                         );
@@ -205,9 +346,11 @@ namespace Horror
             Transform hidePoint = hidePoints[currentPairIndex];
             monsterObject.SetActive(true);
             agent.Warp(hidePoint.position);
+            stateEnterTime = Time.time;
 
             if (threat >= threatThreshold && Random.value < chaseChance)
             {
+                Debug.Log($"[Monster] Threat high ({threat:F1} >= {threatThreshold:F1}). Transitioning to CHASE immediately!");
                 StartChasing();
             }
             else
@@ -216,21 +359,35 @@ namespace Horror
                 agent.speed = moveSpeed;
                 agent.destination = targetPoint.position;
                 state = MonsterState.MovingToStalk;
+                Debug.Log($"[Monster] Spawned. Moving from HidePoint[{currentPairIndex}] to StalkPoint[{currentPairIndex}]. Threat: {threat:F1}");
             }
         }
 
         private void StartChasing()
         {
             state = MonsterState.Chasing;
+            stateEnterTime = Time.time;
             chaseStartTime = Time.time;
             monsterObject.SetActive(true);
             agent.speed = initialChaseSpeed;
             agent.destination = playerCamera.transform.position;
+            Debug.LogWarning($"[Monster] CHASE started! Speed: {initialChaseSpeed:F1}. Threat: {threat:F1}");
+        }
+
+        private void StartSearching()
+        {
+            state = MonsterState.Searching;
+            stateEnterTime = Time.time;
+            searchEndTime = 0f;
+            agent.speed = moveSpeed;
+            agent.destination = lastSeenPosition;
+            Debug.Log($"[Monster] Lost player (LOS blocked & Threat {threat:F1} < {soundDetectionThreshold:F1}). Searching last seen position: {lastSeenPosition}");
         }
 
         private void StartBackingAway()
         {
             state = MonsterState.BackingAway;
+            stateEnterTime = Time.time;
             escapeEndTime = Time.time + escapeDuration;
 
             Vector3 awayDirection = (monsterObject.transform.position - playerCamera.transform.position).normalized;
@@ -241,13 +398,16 @@ namespace Horror
 
             agent.speed = moveSpeed;
             agent.destination = destination;
+            Debug.Log($"[Monster] Player outran the monster. Backing away for {escapeDuration}s...");
         }
 
         private void StartJumpscare()
         {
             state = MonsterState.Jumpscare;
+            stateEnterTime = Time.time;
             threat = 0f;
             jumpscareEndTime = Time.time + jumpscareDuration;
+            Debug.LogWarning($"[Monster] JUMPSCARE triggered! Caught player!");
 
             // Freeze player inputs and movement
             playerController.enabled = false;
@@ -282,6 +442,30 @@ namespace Horror
             {
                 jumpscareAudioSource.PlayOneShot(jumpscareClip);
             }
+        }
+
+        private bool CanSeePlayer()
+        {
+            float dist = Vector3.Distance(monsterObject.transform.position, playerCamera.transform.position);
+            if (dist > sightRange)
+            {
+                return false;
+            }
+
+            Vector3 start = monsterObject.transform.position + Vector3.up * 1.5f;
+            Vector3 end = playerCamera.transform.position;
+
+            RaycastHit hit;
+            if (Physics.Linecast(start, end, out hit))
+            {
+                // Check if the hit object belongs to the player structure (root or child)
+                var hitController = hit.transform.GetComponentInParent<StarterAssets.FirstPersonController>();
+                if (hitController != playerController && hit.transform != playerCamera.transform)
+                {
+                    return false;
+                }
+            }
+            return true;
         }
 
         private int PickValidPairIndex()
@@ -335,11 +519,34 @@ namespace Horror
             agent.speed = moveSpeed;
             agent.destination = targetPoint.position;
             state = MonsterState.MovingToHide;
+            stateEnterTime = Time.time;
         }
 
-        private bool HasReachedTarget()
+        private bool HasReachedPosition(Vector3 targetPos)
         {
-            return !agent.pathPending && agent.remainingDistance <= agent.stoppingDistance;
+            // Ignore target arrival check for the first 0.2 seconds of state transition to handle latency
+            if (Time.time - stateEnterTime < 0.2f)
+            {
+                return false;
+            }
+
+            Vector3 flatMonster = new Vector3(monsterObject.transform.position.x, 0f, monsterObject.transform.position.z);
+            Vector3 flatTarget = new Vector3(targetPos.x, 0f, targetPos.z);
+            
+            if (Vector3.Distance(flatMonster, flatTarget) <= (agent.stoppingDistance + 0.5f))
+            {
+                return true;
+            }
+
+            if (agent.isActiveAndEnabled && !agent.pathPending && agent.hasPath)
+            {
+                if (agent.remainingDistance <= agent.stoppingDistance)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 }
