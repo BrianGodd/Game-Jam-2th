@@ -1,14 +1,19 @@
 using UnityEngine;
 using UnityEngine.AI;
+using UnityEngine.InputSystem;
 
 namespace Horror
 {
     public class MonsterPresenceDirector : MonoBehaviour
     {
+        [Header("References")]
         public GameObject monsterObject;
         public Camera playerCamera;
+        public StarterAssets.FirstPersonController playerController;
         public Transform[] stalkPoints;
         public Transform[] hidePoints;
+
+        [Header("Stalking Settings")]
         public float firstDelay = 8f;
         public float minInterval = 12f;
         public float maxInterval = 25f;
@@ -37,6 +42,11 @@ namespace Horror
         public float escapeDistance = 8f;
         public float escapeDuration = 3f;
 
+        [Header("Jumpscare Settings")]
+        public AudioSource jumpscareAudioSource;
+        public AudioClip jumpscareClip;
+        public float jumpscareDuration = 2.5f;
+
         private enum MonsterState
         {
             Hidden,
@@ -44,7 +54,8 @@ namespace Horror
             Stalking,
             MovingToHide,
             Chasing,
-            BackingAway
+            BackingAway,
+            Jumpscare
         }
 
         private MonsterState state;
@@ -52,6 +63,7 @@ namespace Horror
         private float hideTime;
         private float chaseStartTime;
         private float escapeEndTime;
+        private float jumpscareEndTime;
         private Transform targetPoint;
         private int currentPairIndex = -1;
         private NavMeshAgent agent;
@@ -64,7 +76,18 @@ namespace Horror
             }
 
             agent = monsterObject.GetComponent<NavMeshAgent>();
-            agent.updateRotation = false; // Disable auto-rotation so FacePlayer can control rotation
+            agent.updateRotation = false; // FacePlayer handles rotation manually
+
+            if (playerController == null)
+            {
+                playerController = playerCamera.GetComponentInParent<StarterAssets.FirstPersonController>();
+                if (playerController == null)
+                {
+                    Debug.LogError("MonsterPresenceDirector: playerController is not assigned! Disabling script.", this);
+                    enabled = false;
+                    return;
+                }
+            }
 
             currentPairIndex = Random.Range(0, Mathf.Min(stalkPoints.Length, hidePoints.Length));
             targetPoint = hidePoints[currentPairIndex];
@@ -76,7 +99,6 @@ namespace Horror
 
         private void Update()
         {
-            // Threat continuously increases
             threat += Time.deltaTime * threatIncreaseRate;
 
             if (state == MonsterState.Hidden)
@@ -88,93 +110,91 @@ namespace Horror
                 return;
             }
 
-            // Continuously face the player when not hidden
             FacePlayer();
 
-            // If threat is above threshold, and we are stalking or moving to stalk,
-            // we have a chance to trigger a chase dynamically
-            if (threat >= threatThreshold && (state == MonsterState.MovingToStalk || state == MonsterState.Stalking))
+            switch (state)
             {
-                if (Random.value < chaseChance * Time.deltaTime)
-                {
-                    StartChasing();
-                }
-            }
+                case MonsterState.MovingToStalk:
+                case MonsterState.Stalking:
+                    // Check dynamic chase trigger
+                    if (threat >= threatThreshold && Random.value < chaseChance * Time.deltaTime)
+                    {
+                        StartChasing();
+                        return;
+                    }
+                    // Check dynamic retreat trigger
+                    if (ShouldVanishNow())
+                    {
+                        Retreat();
+                        return;
+                    }
 
-            // If player looks at the monster, immediately retreat (move back to HidePoint)
-            if (ShouldVanishNow())
-            {
-                if (state == MonsterState.MovingToStalk || state == MonsterState.Stalking)
-                {
-                    Retreat();
-                }
-            }
+                    if (state == MonsterState.MovingToStalk)
+                    {
+                        if (HasReachedTarget())
+                        {
+                            state = MonsterState.Stalking;
+                            hideTime = Time.time + stayDuration;
+                            agent.ResetPath();
+                        }
+                    }
+                    else // Stalking
+                    {
+                        if (Time.time >= hideTime)
+                        {
+                            Retreat();
+                        }
+                    }
+                    break;
 
-            if (state == MonsterState.MovingToStalk)
-            {
-                if (HasReachedTarget())
-                {
-                    state = MonsterState.Stalking;
-                    hideTime = Time.time + stayDuration;
-                    agent.ResetPath();
-                }
-                return;
-            }
+                case MonsterState.MovingToHide:
+                    if (HasReachedTarget())
+                    {
+                        monsterObject.SetActive(false);
+                        state = MonsterState.Hidden;
+                        ScheduleNextSighting();
+                    }
+                    break;
 
-            if (state == MonsterState.Stalking)
-            {
-                if (Time.time >= hideTime)
-                {
-                    Retreat();
-                }
-                return;
-            }
+                case MonsterState.Chasing:
+                    // Speed decays over time during chase
+                    float elapsed = Time.time - chaseStartTime;
+                    float t = Mathf.Clamp01(elapsed / speedDecayDuration);
+                    agent.speed = Mathf.Lerp(initialChaseSpeed, finalChaseSpeed, t);
 
-            if (state == MonsterState.MovingToHide)
-            {
-                if (HasReachedTarget())
-                {
-                    monsterObject.SetActive(false);
-                    state = MonsterState.Hidden;
-                    ScheduleNextSighting();
-                }
-                return;
-            }
+                    agent.destination = playerCamera.transform.position;
 
-            if (state == MonsterState.Chasing)
-            {
-                // Calculate speed decay over time
-                float elapsed = Time.time - chaseStartTime;
-                float t = Mathf.Clamp01(elapsed / speedDecayDuration);
-                agent.speed = Mathf.Lerp(initialChaseSpeed, finalChaseSpeed, t);
+                    float distance = Vector3.Distance(monsterObject.transform.position, playerCamera.transform.position);
+                    if (distance <= attackDistance)
+                    {
+                        StartJumpscare();
+                    }
+                    else if (elapsed >= chaseGracePeriod && distance >= loseDistance)
+                    {
+                        threat = 0f;
+                        StartBackingAway();
+                    }
+                    break;
 
-                agent.destination = playerCamera.transform.position;
+                case MonsterState.BackingAway:
+                    if (HasReachedTarget() || Time.time >= escapeEndTime)
+                    {
+                        monsterObject.SetActive(false);
+                        state = MonsterState.Hidden;
+                        ScheduleNextSighting();
+                    }
+                    break;
 
-                float distance = Vector3.Distance(monsterObject.transform.position, playerCamera.transform.position);
-                if (distance <= attackDistance)
-                {
-                    Debug.LogWarning("Monster caught the player!");
-                    threat = 0f;
-                    Retreat();
-                }
-                else if (elapsed >= chaseGracePeriod && distance >= loseDistance)
-                {
-                    Debug.Log("Player outran the monster. Backing away.");
-                    threat = 0f;
-                    StartBackingAway();
-                }
-                return;
-            }
+                case MonsterState.Jumpscare:
+                    playerCamera.transform.LookAt(monsterObject.transform.position + Vector3.up * 1.5f);
 
-            if (state == MonsterState.BackingAway)
-            {
-                if (HasReachedTarget() || Time.time >= escapeEndTime)
-                {
-                    monsterObject.SetActive(false);
-                    state = MonsterState.Hidden;
-                    ScheduleNextSighting();
-                }
-                return;
+                    if (Time.time >= jumpscareEndTime)
+                    {
+                        UnityEngine.SceneManagement.SceneManager.LoadScene(
+                            UnityEngine.SceneManagement.SceneManager.GetActiveScene().name
+                        );
+                    }
+                    break;
             }
         }
 
@@ -213,7 +233,6 @@ namespace Horror
             state = MonsterState.BackingAway;
             escapeEndTime = Time.time + escapeDuration;
 
-            // Calculate direction away from the player
             Vector3 awayDirection = (monsterObject.transform.position - playerCamera.transform.position).normalized;
             awayDirection.y = 0f;
             awayDirection = awayDirection.normalized;
@@ -222,6 +241,47 @@ namespace Horror
 
             agent.speed = moveSpeed;
             agent.destination = destination;
+        }
+
+        private void StartJumpscare()
+        {
+            state = MonsterState.Jumpscare;
+            threat = 0f;
+            jumpscareEndTime = Time.time + jumpscareDuration;
+
+            // Freeze player inputs and movement
+            playerController.enabled = false;
+
+            var playerInput = playerController.GetComponent<PlayerInput>();
+            if (playerInput != null) playerInput.enabled = false;
+
+            var inputs = playerController.GetComponent<StarterAssets.StarterAssetsInputs>();
+            if (inputs != null)
+            {
+                inputs.move = Vector2.zero;
+                inputs.look = Vector2.zero;
+                inputs.enabled = false;
+            }
+
+            // Freeze monster NavMeshAgent
+            if (agent != null)
+            {
+                agent.ResetPath();
+                agent.enabled = false;
+            }
+
+            // Position monster in front of camera
+            Vector3 facePos = playerCamera.transform.position + playerCamera.transform.forward * 1.0f;
+            facePos.y = playerCamera.transform.position.y - 0.5f;
+            monsterObject.transform.position = facePos;
+            monsterObject.transform.LookAt(playerCamera.transform.position);
+
+            playerCamera.transform.LookAt(monsterObject.transform.position + Vector3.up * 1.5f);
+
+            if (jumpscareAudioSource != null && jumpscareClip != null)
+            {
+                jumpscareAudioSource.PlayOneShot(jumpscareClip);
+            }
         }
 
         private int PickValidPairIndex()
