@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.AI;
 using UnityEngine.InputSystem;
 using Cinemachine;
+using System.Collections.Generic;
 
 namespace Horror
 {
@@ -59,7 +60,7 @@ namespace Horror
 
         private Vector3 jumpscareCameraBaseLocalPos;
 
-        private enum MonsterState
+        public enum MonsterState
         {
             Hidden,
             MovingToStalk,
@@ -72,6 +73,8 @@ namespace Horror
         }
 
         private MonsterState state;
+
+        public MonsterState CurrentState => state;
         private float nextSightingTime;
         private float hideTime;
         private float chaseStartTime;

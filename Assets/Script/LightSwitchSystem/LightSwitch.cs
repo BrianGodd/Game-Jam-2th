@@ -12,6 +12,7 @@ namespace LightSwitchSystem
         [SerializeField] private bool startOn = true;
 
         public bool IsOn { get; private set; }
+        public List<Light> Lights => lights;
 
         private void Awake()
         {
