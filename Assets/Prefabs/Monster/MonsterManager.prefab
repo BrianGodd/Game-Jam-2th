@@ -68,12 +68,12 @@ MonoBehaviour:
   vanishWhenLookedAt: 1
   sightRange: 20
   threat: 0
-  threatThreshold: 20
-  walkThreatRate: 1
-  runThreatRate: 5
+  threatThreshold: 100
+  walkThreatRate: 4
+  runThreatRate: 25
   threatDecayRate: 0.5
   chaseChance: 1
-  soundDetectionThreshold: 50
+  soundDetectionThreshold: 150
   initialChaseSpeed: 8
   finalChaseSpeed: 2
   speedDecayDuration: 5
@@ -87,6 +87,9 @@ MonoBehaviour:
   jumpscareAudioSource: {fileID: 0}
   jumpscareClip: {fileID: 0}
   jumpscareDuration: 2.5
+  jumpscareHeightOffset: 0
+  jumpscareShakeIntensity: 3
+  jumpscarePositionalShake: 0.05
 --- !u!114 &8032852224277358888
 MonoBehaviour:
   m_ObjectHideFlags: 0

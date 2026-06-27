@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.AI;
 using UnityEngine.InputSystem;
 using Cinemachine;
+using System.Collections.Generic;
 
 namespace Horror
 {
@@ -59,7 +60,7 @@ namespace Horror
 
         private Vector3 jumpscareCameraBaseLocalPos;
 
-        private enum MonsterState
+        public enum MonsterState
         {
             Hidden,
             MovingToStalk,
@@ -72,6 +73,8 @@ namespace Horror
         }
 
         private MonsterState state;
+
+        public MonsterState CurrentState => state;
         private float nextSightingTime;
         private float hideTime;
         private float chaseStartTime;
@@ -504,25 +507,22 @@ namespace Horror
             return true;
         }
 
-        private bool CanPlayerSeePoint(Vector3 pointPosition)
+        private bool CanHidePointSeePlayer(Vector3 hidePointPosition)
         {
-            if (!IsInView(pointPosition))
-            {
-                return false;
-            }
+            Vector3 start = hidePointPosition + Vector3.up * 1.5f; // eye level from hidepoint
+            Vector3 end = playerCamera.transform.position;
 
-            Vector3 start = playerCamera.transform.position;
-            Vector3 end = pointPosition;
             RaycastHit hit;
             if (Physics.Linecast(start, end, out hit))
             {
-                // If it hits an obstacle on the way to the point, sight is blocked
-                if (Vector3.Distance(hit.point, pointPosition) > 0.5f)
+                // If it hits an obstacle (wall/collider) other than the player, the sight is blocked
+                var hitController = hit.transform.GetComponentInParent<StarterAssets.FirstPersonController>();
+                if (hitController != playerController && hit.transform != playerCamera.transform)
                 {
-                    return false;
+                    return false; // sight blocked, so HidePoint cannot see player
                 }
             }
-            return true;
+            return true; // clear line of sight, HidePoint can see player
         }
 
         private int PickValidPairIndex()
@@ -537,14 +537,14 @@ namespace Horror
                 
                 float distance = Vector3.Distance(playerCamera.transform.position, stalkPoint.position);
                 
-                // HidePoint must NOT be visible to the player to prevent popping out of thin air
-                if (distance >= minStalkDistance && distance <= maxStalkDistance && !CanPlayerSeePoint(hidePoint.position))
+                // HidePoint must NOT be able to see the player to ensure it is hidden behind physical geometry
+                if (distance >= minStalkDistance && distance <= maxStalkDistance && !CanHidePointSeePlayer(hidePoint.position))
                 {
                     return index;
                 }
             }
 
-            throw new System.InvalidOperationException("No valid stalk point is within range, or all corresponding hide points are currently visible to the player.");
+            throw new System.InvalidOperationException("No valid stalk point is within range, or all corresponding hide points have direct line of sight to the player.");
         }
 
         private void ScheduleNextSighting()
