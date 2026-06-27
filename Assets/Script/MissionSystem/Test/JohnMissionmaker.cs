@@ -37,6 +37,6 @@ public class JohnMissionmaker : MonoBehaviour
 
     public void Start()
     {
-        InvokeRepeating(nameof(CheckMission), 1f, 5f);
+        InvokeRepeating(nameof(CheckMission), 1f, 2f);
     }
 }
