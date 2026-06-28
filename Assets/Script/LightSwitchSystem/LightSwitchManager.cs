@@ -88,6 +88,26 @@ namespace LightSwitchSystem
             }
         }
 
+        public bool HasSwitchOn()
+        {
+            return GetSwitchOnCount() > 0;
+        }
+
+        public int GetSwitchOnCount()
+        {
+            int count = 0;
+            for (int i = 0; i < lightSwitches.Count; i++)
+            {
+                LightSwitch lightSwitch = lightSwitches[i];
+                if (lightSwitch != null && lightSwitch.IsOn)
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
         private void InitializeLightSwitchList()
         {
             HashSet<LightSwitch> uniqueSwitches = new();
