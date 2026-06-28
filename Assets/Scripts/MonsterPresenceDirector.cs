@@ -174,7 +174,7 @@ namespace Horror
 
         private void Update()
         {
-            if (GameManager.CurrentDay <= 1)
+            if (GameManager.CurrentDay <= 0)
             {
                 threat = 0f;
                 state = MonsterState.Hidden;
@@ -568,7 +568,7 @@ namespace Horror
 
         private bool CanChaseToday()
         {
-            return GameManager.CurrentDay >= 3;
+            return GameManager.CurrentDay >= 1;
         }
 
         private void StartBackingAway()
