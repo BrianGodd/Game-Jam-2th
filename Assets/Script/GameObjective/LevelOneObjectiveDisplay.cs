@@ -3,6 +3,7 @@ using UnityEngine;
 
 public class LevelOneObjectiveDisplay : MonoBehaviour
 {
+    [SerializeField] private GameManager gameManager;
     [SerializeField] private LevelOneObjective objective;
     [SerializeField] private TMP_Text statusText;
 
@@ -13,14 +14,17 @@ public class LevelOneObjectiveDisplay : MonoBehaviour
 
     private string BuildStatusText()
     {
-        if (objective.IsCompleted())
-        {
-            return "Objectives complete";
-        }
+        float remainingMinutes = gameManager.RemainingTimeSeconds / 60f;
+        string timeText = remainingMinutes.ToString("00.0");
 
         int lightsOn = objective.LightsOnCount;
         int unlockedDoors = objective.UnlockedDoorCount;
 
-        return $"Lights on: {lightsOn}\nDoors unlocked: {unlockedDoors}";
+        if (objective.IsCompleted())
+        {
+            return $"Time: {timeText}\nLights on: {lightsOn}\nDoors unlocked: {unlockedDoors}\nObjectives complete";
+        }
+
+        return $"Time: {timeText}\nLights on: {lightsOn}\nDoors unlocked: {unlockedDoors}";
     }
 }
