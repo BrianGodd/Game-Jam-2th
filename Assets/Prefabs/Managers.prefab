@@ -320,7 +320,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   gameLengthMinutes: 1
-  gameObjective: {fileID: 0}
+  gameObjective: {fileID: 3249472782026233607}
   timeCompleteness: 0
 --- !u!1 &5760578582517288468
 GameObject:

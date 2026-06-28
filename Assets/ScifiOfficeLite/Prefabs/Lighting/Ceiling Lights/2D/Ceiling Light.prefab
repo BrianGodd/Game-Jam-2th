@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 7435466893150946102}
   - component: {fileID: 3399012332467660778}
   - component: {fileID: 6822781158728480900}
+  - component: {fileID: 1377976939346566594}
   m_Layer: 0
   m_Name: Ceiling Light
   m_TagString: Untagged
@@ -152,6 +153,21 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+--- !u!114 &1377976939346566594
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4789936396316217191}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 919f1d2c8ddc23b4594c6ed7f60755c8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  lights:
+  - {fileID: 3180807762072220565}
+  startOn: 1
 --- !u!1 &5210574598823997957
 GameObject:
   m_ObjectHideFlags: 0
@@ -356,6 +372,10 @@ PrefabInstance:
         type: 3}
       insertIndex: -1
       addedObject: {fileID: 1268738511589947737}
+    - targetCorrespondingSourceObject: {fileID: -927199367670048503, guid: 03f0313d06795894e85c89bfc12f42e9,
+        type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 7293402570221471905}
   m_SourcePrefab: {fileID: 100100000, guid: 03f0313d06795894e85c89bfc12f42e9, type: 3}
 --- !u!1 &1362500917715853451 stripped
 GameObject:
@@ -385,6 +405,43 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: 4384541303843338974, guid: 03f0313d06795894e85c89bfc12f42e9, type: 3}
+--- !u!114 &7293402570221471905
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1362500917715853451}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dc0a79ec6e272bf429b3dbb5dcc11872, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  OnRaycastEnter:
+    m_PersistentCalls:
+      m_Calls: []
+  OnRaycastExit:
+    m_PersistentCalls:
+      m_Calls: []
+  OnInteract:
+    m_PersistentCalls:
+      m_Calls:
+      - m_Target: {fileID: 1377976939346566594}
+        m_TargetAssemblyTypeName: LightSwitchSystem.LightSwitch, Assembly-CSharp
+        m_MethodName: Toggle
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
+  OnHoldInteract:
+    m_PersistentCalls:
+      m_Calls: []
+  debug: 1
 --- !u!4 &2644680080001733272 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -4216859302048453862, guid: 03f0313d06795894e85c89bfc12f42e9,

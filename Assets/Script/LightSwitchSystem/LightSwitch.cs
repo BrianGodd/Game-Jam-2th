@@ -10,8 +10,8 @@ namespace LightSwitchSystem
     {
         [SerializeField] private List<Light> lights = new();
         [SerializeField] private bool startOn = true;
-
-        public bool IsOn { get; private set; }
+        [SerializeField] private bool isOn = true;
+        public bool IsOn => isOn;
         public List<Light> Lights => lights;
 
         private void Awake()
@@ -46,7 +46,8 @@ namespace LightSwitchSystem
 
         private void ApplyState(bool isOn)
         {
-            IsOn = isOn;
+            Debug.Log($"[{gameObject.name}|{name}]: Light {(isOn? "on" : "off")}");
+            this.isOn = isOn;
 
             for (int i = 0; i < lights.Count; i++)
             {
