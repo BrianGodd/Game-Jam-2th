@@ -58,6 +58,10 @@ MonoBehaviour:
   - {fileID: 0}
   - {fileID: 0}
   - {fileID: 0}
+  monsterAnimator: {fileID: 0}
+  rotationOffset: 180
+  monsterHead: {fileID: 0}
+  headRotationOffset: {x: 0, y: 0, z: 0}
   firstDelay: 2
   minInterval: 3
   maxInterval: 4
@@ -72,6 +76,8 @@ MonoBehaviour:
   walkThreatRate: 4
   runThreatRate: 25
   threatDecayRate: 0.5
+  jumpThreat: 20
+  landThreat: 50
   chaseChance: 1
   soundDetectionThreshold: 150
   initialChaseSpeed: 8
@@ -87,9 +93,11 @@ MonoBehaviour:
   jumpscareAudioSource: {fileID: 0}
   jumpscareClip: {fileID: 0}
   jumpscareDuration: 2.5
-  jumpscareHeightOffset: 0
+  jumpscareOffset: {x: 0, y: 0, z: 0}
   jumpscareShakeIntensity: 3
   jumpscarePositionalShake: 0.05
+  bodyShakeIntensity: 0.03
+  bodyShakeSpeed: 25
 --- !u!114 &8032852224277358888
 MonoBehaviour:
   m_ObjectHideFlags: 0

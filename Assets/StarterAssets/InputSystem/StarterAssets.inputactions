@@ -51,27 +51,9 @@
                     "initialStateCheck": false
                 },
                 {
-                    "name": "Close",
-                    "type": "Button",
-                    "id": "bbf8383b-35e2-41d2-a6c3-9146bddc067f",
-                    "expectedControlType": "",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": false
-                },
-                {
-                    "name": "ShiftLeft",
-                    "type": "Button",
-                    "id": "caa9e046-98ee-44bb-b7aa-cf980da9532c",
-                    "expectedControlType": "",
-                    "processors": "",
-                    "interactions": "",
-                    "initialStateCheck": false
-                },
-                {
-                    "name": "ShiftRight",
-                    "type": "Button",
-                    "id": "573c7ab7-cd61-456e-8831-6e15123079c1",
+                    "name": "Crouch",
+                    "type": "PassThrough",
+                    "id": "15f7bd13-8490-4a07-9b1a-bd2b3741818d",
                     "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
@@ -268,34 +250,12 @@
                 },
                 {
                     "name": "",
-                    "id": "285c75ec-824d-4475-b7ec-4d6806bc2654",
-                    "path": "<Keyboard>/q",
+                    "id": "8a242d7e-f1b8-4b19-a305-e5ac5377d69b",
+                    "path": "<Keyboard>/leftCtrl",
                     "interactions": "",
                     "processors": "",
-                    "groups": "",
-                    "action": "Close",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "05493995-e3b6-469f-992f-16d695763b75",
-                    "path": "<Keyboard>/leftArrow",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "",
-                    "action": "ShiftLeft",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "9ff59865-7432-47d4-8c97-e80ec4e56458",
-                    "path": "<Keyboard>/rightArrow",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "",
-                    "action": "ShiftRight",
+                    "groups": "KeyboardMouse",
+                    "action": "Crouch",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

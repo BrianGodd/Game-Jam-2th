@@ -5,6 +5,8 @@ TagManager:
   serializedVersion: 2
   tags:
   - CinemachineTarget
+  - Portal
+  - Door
   layers:
   - Default
   - TransparentFX
@@ -14,8 +16,7 @@ TagManager:
   - UI
   - Light Source
   - Player
-  - 
-  - 
+  - Monster
   - 
   - 
   - 
