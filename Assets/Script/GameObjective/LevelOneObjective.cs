@@ -6,6 +6,10 @@ using static DoorSystem.DoorControl.DoorState;
 
 public class LevelOneObjective : GameObjective
 {
+    public int LightsOnCount => LightSwitchManager.Instance.GetSwitchOnCount();
+
+    public int UnlockedDoorCount => DoorManager.Instance.CountDoorsWithState(~Locked);
+
     public override bool IsCompleted()
     {
         DoorState notLocked = ~Locked;

@@ -89,6 +89,11 @@ namespace DoorSystem
             return doors.Any(door => door != null && (door.State & state) != 0);
         }
 
+        public int CountDoorsWithState(DoorControl.DoorState state)
+        {
+            return doors.Count(door => door != null && (door.State & state) != 0);
+        }
+
         #endregion
 
         #region Private Methods
