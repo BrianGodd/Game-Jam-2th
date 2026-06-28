@@ -201,6 +201,7 @@ GameObject:
   - component: {fileID: 4460852453125314819}
   - component: {fileID: 3731194935552810579}
   - component: {fileID: 7801640596800071202}
+  - component: {fileID: 998877665544332211}
   m_Layer: 0
   m_Name: Door Wall Opaque
   m_TagString: Untagged
@@ -459,6 +460,19 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+--- !u!114 &998877665544332211
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6090240345492802339}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2f5e7c61df4746cab3d73c6138e0ef70, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  interactKeyText: E
 --- !u!1001 &732556957
 PrefabInstance:
   m_ObjectHideFlags: 0
