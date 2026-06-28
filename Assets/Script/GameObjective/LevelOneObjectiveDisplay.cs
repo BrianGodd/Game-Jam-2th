@@ -22,9 +22,9 @@ public class LevelOneObjectiveDisplay : MonoBehaviour
 
         if (objective.IsCompleted())
         {
-            return $"Time: {timeText}\nLights on: {lightsOn}\nDoors unlocked: {unlockedDoors}\nObjectives complete";
+            return $"Time: {timeText}\nDoors unlocked: {unlockedDoors}\nObjectives complete";
         }
 
         return $"Time: {timeText}\nLights on: {lightsOn}\nDoors unlocked: {unlockedDoors}";
-    }
+    }//Lights on: {lightsOn}\n
 }
