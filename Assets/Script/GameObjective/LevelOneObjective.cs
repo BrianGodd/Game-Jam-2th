@@ -14,8 +14,8 @@ public class LevelOneObjective : GameObjective
     {
         DoorState notLocked = ~Locked;
         bool allDoorsLocked = !DoorManager.Instance.HasDoorWithState(notLocked);
-        //bool allLightsOff = !LightSwitchManager.Instance.HasSwitchOn();
-        return allDoorsLocked;// && allLightsOff;
+        bool allLightsOff = !LightSwitchManager.Instance.HasSwitchOn();
+        return allDoorsLocked && allLightsOff;
     }
 
     [ContextMenu("Check Completion Status")]

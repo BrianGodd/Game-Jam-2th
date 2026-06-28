@@ -29,10 +29,10 @@ namespace LightSwitchSystem
 
         private class LightData
         {
+            public LightSwitch lightSwitch;
             public Light lightComponent;
             public float originalIntensity;
             public Color originalColor;
-            public bool originalEnabled;
         }
 
         private List<LightData> cachedAnomalyLights = new();
@@ -167,10 +167,10 @@ namespace LightSwitchSystem
                         {
                             cachedAnomalyLights.Add(new LightData
                             {
+                                lightSwitch = sw,
                                 lightComponent = lt,
                                 originalIntensity = lt.intensity,
                                 originalColor = lt.color,
-                                originalEnabled = lt.enabled
                             });
                         }
                     }
@@ -248,8 +248,14 @@ namespace LightSwitchSystem
             {
                 if (data.lightComponent == null) continue;
 
+                if (!data.lightSwitch.IsOn)
+                {
+                    data.lightComponent.enabled = false;
+                    continue;
+                }
+
                 data.lightComponent.color = data.originalColor;
-                data.lightComponent.enabled = data.originalEnabled;
+                data.lightComponent.enabled = true;
                 data.lightComponent.intensity = data.originalIntensity * finalMultiplier;
             }
         }
@@ -258,12 +264,17 @@ namespace LightSwitchSystem
         {
             foreach (var data in cachedAnomalyLights)
             {
-                if (data.lightComponent != null)
+                if (data.lightComponent == null) continue;
+
+                if (!data.lightSwitch.IsOn)
                 {
-                    data.lightComponent.color = data.originalColor;
-                    data.lightComponent.intensity = data.originalIntensity;
-                    data.lightComponent.enabled = data.originalEnabled;
+                    data.lightComponent.enabled = false;
+                    continue;
                 }
+
+                data.lightComponent.color = data.originalColor;
+                data.lightComponent.intensity = data.originalIntensity;
+                data.lightComponent.enabled = true;
             }
         }
     }
