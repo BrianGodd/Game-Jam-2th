@@ -129,6 +129,8 @@ namespace Horror
 
         private void Awake()
         {
+            AutoAssignPointArrays();
+
             if (stalkPoints == null || stalkPoints.Length == 0 || hidePoints == null || hidePoints.Length == 0)
             {
                 throw new System.InvalidOperationException("Stalk points or Hide points are not configured.");
@@ -172,6 +174,14 @@ namespace Horror
 
         private void Update()
         {
+            if (GameManager.CurrentDay <= 1)
+            {
+                threat = 0f;
+                state = MonsterState.Hidden;
+                monsterObject.SetActive(false);
+                return;
+            }
+
             bool isMoving = false;
             bool isRunning = false;
             bool playerJustJumped = false;
@@ -249,7 +259,7 @@ namespace Horror
                 case MonsterState.MovingToStalk:
                 case MonsterState.Stalking:
                     // Check dynamic chase trigger
-                    if (threat >= threatThreshold && Random.value < chaseChance * Time.deltaTime)
+                    if (CanChaseToday() && threat >= threatThreshold && Random.value < chaseChance * Time.deltaTime)
                     {
                         Debug.Log($"[Monster] Dynamic trigger: Threat high ({threat:F1}). Transitioning to CHASE!");
                         StartChasing();
@@ -477,9 +487,7 @@ namespace Horror
                     if (Time.time >= jumpscareEndTime)
                     {
                         Debug.Log("[Monster] Jumpscare finished. Reloading scene...");
-                        UnityEngine.SceneManagement.SceneManager.LoadScene(
-                            UnityEngine.SceneManagement.SceneManager.GetActiveScene().name
-                        );
+                        GameManager.Instance.LoseGame();
                     }
                     break;
             }
@@ -502,7 +510,7 @@ namespace Horror
             monsterObject.transform.position = hidePoint.position; // Manually sync transform when updatePosition is false
             stateEnterTime = Time.time;
 
-            if (threat >= threatThreshold && Random.value < chaseChance)
+            if (CanChaseToday() && threat >= threatThreshold && Random.value < chaseChance)
             {
                 Debug.Log($"[Monster] Threat high ({threat:F1} >= {threatThreshold:F1}). Transitioning to CHASE immediately!");
                 StartChasing();
@@ -520,6 +528,12 @@ namespace Horror
 
         private void StartChasing(bool playChaseClip = true)
         {
+            if (!CanChaseToday())
+            {
+                Debug.Log("[Monster] Chase blocked before Day 3.");
+                return;
+            }
+
             state = MonsterState.Chasing;
             stateEnterTime = Time.time;
             chaseStartTime = Time.time;
@@ -550,6 +564,11 @@ namespace Horror
             agent.destination = lastSeenPosition;
             PlayAnimation("Walking");
             Debug.Log($"[Monster] Lost player (LOS blocked & Threat {threat:F1} < {soundDetectionThreshold:F1}). Searching last seen position: {lastSeenPosition}");
+        }
+
+        private bool CanChaseToday()
+        {
+            return GameManager.CurrentDay >= 3;
         }
 
         private void StartBackingAway()
@@ -638,6 +657,45 @@ namespace Horror
             }
 
             jumpscareAudioSource.PlayOneShot(jumpscareClip);
+        }
+
+        private void AutoAssignPointArrays()
+        {
+            Transform[] transforms = FindObjectsByType<Transform>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            if (stalkPoints == null || stalkPoints.Length == 0)
+            {
+                stalkPoints = FindNamedPoints(transforms, "StalkPoint");
+            }
+
+            if (hidePoints == null || hidePoints.Length == 0)
+            {
+                hidePoints = FindNamedPoints(transforms, "HidePoint");
+            }
+        }
+
+        private Transform[] FindNamedPoints(Transform[] transforms, string prefix)
+        {
+            List<Transform> points = new();
+            for (int i = 0; i < transforms.Length; i++)
+            {
+                if (IsPointName(transforms[i].name, prefix))
+                {
+                    points.Add(transforms[i]);
+                }
+            }
+
+            Transform[] result = points.ToArray();
+            System.Array.Sort(result, (a, b) => string.CompareOrdinal(a.name, b.name));
+            return result;
+        }
+
+        private bool IsPointName(string objectName, string prefix)
+        {
+            if (!objectName.StartsWith(prefix)) return false;
+            if (objectName.Length == prefix.Length) return true;
+
+            char next = objectName[prefix.Length];
+            return !char.IsLetter(next);
         }
 
         private bool IsPlayerHiding()

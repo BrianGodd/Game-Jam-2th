@@ -159,11 +159,11 @@ MonoBehaviour:
   minInterval: 3
   maxInterval: 4
   stayDuration: 5
-  minStalkDistance: 3
-  maxStalkDistance: 14
+  minStalkDistance: 5
+  maxStalkDistance: 20
   moveSpeed: 4
   vanishWhenLookedAt: 1
-  sightRange: 20
+  sightRange: 25
   threat: 0
   threatThreshold: 100
   walkThreatRate: 4

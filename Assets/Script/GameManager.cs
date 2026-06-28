@@ -3,10 +3,16 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class GameManager : MonoBehaviour
 {
+    const int MaxDay = 4;
+
     static GameManager instance;
+    static int currentDay;
+    static bool hasRuntimeDay;
+
     static public GameManager Instance
     {
         get
@@ -19,6 +25,9 @@ public class GameManager : MonoBehaviour
         }
     }
 
+    public static int CurrentDay => hasRuntimeDay ? currentDay : 1;
+
+    [SerializeField] private int startingDay = 1;
     [SerializeField] private float gameLengthMinutes = 5;
     [SerializeField] private GameObjective gameObjective;
 
@@ -28,6 +37,17 @@ public class GameManager : MonoBehaviour
     public float TimeCompleteness => timeCompleteness;
 
     public event Action OnGameCleanup;
+
+    private void Awake()
+    {
+        instance = this;
+
+        if (!hasRuntimeDay)
+        {
+            currentDay = Mathf.Clamp(startingDay, 1, MaxDay);
+            hasRuntimeDay = true;
+        }
+    }
 
     private void Start()
     {
@@ -66,22 +86,33 @@ public class GameManager : MonoBehaviour
 
     public void LoseGame()
     {
-        // TODO: Implement game lose logic
-        Debug.Log("Game Over: You Lose!");
-
+        Debug.Log($"Day {CurrentDay}: You Lose!");
         CleanupGame();
+        ReloadActiveScene();
     }
 
     public void WinGame()
     {
-        // TODO: Implement game win logic
-        Debug.Log("Game Over: You Win!");
+        if (CurrentDay >= MaxDay)
+        {
+            Debug.Log("Game Over: You Win!");
+            CleanupGame();
+            return;
+        }
 
+        currentDay++;
+        Debug.Log($"Day {currentDay - 1} complete. Loading Day {currentDay}.");
         CleanupGame();
+        ReloadActiveScene();
     }
 
     public void CleanupGame()
     {
         OnGameCleanup?.Invoke();
+    }
+
+    private void ReloadActiveScene()
+    {
+        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
 }
