@@ -16,6 +16,12 @@ namespace StarterAssets
 		public float MoveSpeed = 4.0f;
 		[Tooltip("Sprint speed of the character in m/s")]
 		public float SprintSpeed = 6.0f;
+		[Tooltip("CharacterController height while crouching")]
+		public float CrouchHeight = 1.0f;
+		[Tooltip("How quickly the character transitions between standing and crouching")]
+		public float CrouchTransitionSpeed = 8.0f;
+		[Tooltip("Layers that can block the player from standing up")]
+		public LayerMask CrouchObstructionLayers = ~0;
 		[Tooltip("Rotation speed of the character")]
 		public float RotationSpeed = 1.0f;
 		[Tooltip("Acceleration and deceleration")]
@@ -59,10 +65,13 @@ namespace StarterAssets
 		private float _rotationVelocity;
 		private float _verticalVelocity;
 		private float _terminalVelocity = 53.0f;
+		private float _defaultControllerHeight;
 
 		// timeout deltatime
 		private float _jumpTimeoutDelta;
 		private float _fallTimeoutDelta;
+		private Vector3 _defaultControllerCenter;
+		private Vector3 _defaultCameraTargetLocalPosition;
 
 	
 #if ENABLE_INPUT_SYSTEM
@@ -108,10 +117,14 @@ namespace StarterAssets
 			// reset our timeouts on start
 			_jumpTimeoutDelta = JumpTimeout;
 			_fallTimeoutDelta = FallTimeout;
+			_defaultControllerHeight = _controller.height;
+			_defaultControllerCenter = _controller.center;
+			_defaultCameraTargetLocalPosition = CinemachineCameraTarget.transform.localPosition;
 		}
 
 		private void Update()
 		{
+			Crouch();
 			JumpAndGravity();
 			GroundedCheck();
 			Move();
@@ -154,7 +167,7 @@ namespace StarterAssets
 		private void Move()
 		{
 			// set target speed based on move speed, sprint speed and if sprint is pressed
-			float targetSpeed = _input.sprint ? SprintSpeed : MoveSpeed;
+			float targetSpeed = _input.sprint && !_input.crouch ? SprintSpeed : MoveSpeed;
 
 			// a simplistic acceleration and deceleration designed to be easy to remove, replace, or iterate upon
 
@@ -196,6 +209,38 @@ namespace StarterAssets
 
 			// move the player
 			_controller.Move(inputDirection.normalized * (_speed * Time.deltaTime) + new Vector3(0.0f, _verticalVelocity, 0.0f) * Time.deltaTime);
+		}
+
+		private void Crouch()
+		{
+			bool wantsToStand = !_input.crouch;
+			float targetHeight = wantsToStand && CanStandUp() ? _defaultControllerHeight : CrouchHeight;
+			float nextHeight = Mathf.MoveTowards(_controller.height, targetHeight, CrouchTransitionSpeed * Time.deltaTime);
+			float heightDelta = _defaultControllerHeight - nextHeight;
+
+			_controller.height = nextHeight;
+			_controller.center = new Vector3(
+				_defaultControllerCenter.x,
+				_defaultControllerCenter.y - (heightDelta * 0.5f),
+				_defaultControllerCenter.z);
+
+			CinemachineCameraTarget.transform.localPosition = new Vector3(
+				_defaultCameraTargetLocalPosition.x,
+				_defaultCameraTargetLocalPosition.y - (heightDelta * 0.5f),
+				_defaultCameraTargetLocalPosition.z);
+		}
+
+		private bool CanStandUp()
+		{
+			float radius = _controller.radius;
+			float halfHeight = _defaultControllerHeight * 0.5f;
+			float sphereOffset = halfHeight - radius;
+			Vector3 worldCenter = transform.TransformPoint(_defaultControllerCenter);
+			Vector3 top = worldCenter + Vector3.up * sphereOffset;
+			Vector3 bottom = worldCenter - Vector3.up * sphereOffset;
+			int obstructionMask = CrouchObstructionLayers & ~(1 << gameObject.layer);
+
+			return !Physics.CheckCapsule(top, bottom, radius, obstructionMask, QueryTriggerInteraction.Ignore);
 		}
 
 		private void JumpAndGravity()
