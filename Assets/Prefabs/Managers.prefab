@@ -320,7 +320,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   startingDay: 1
-  gameLengthMinutes: 2.5
+  gameLengthMinutes: 3
   gameObjective: {fileID: 3249472782026233607}
   timeCompleteness: 0
   elapsedTimeSeconds: 0

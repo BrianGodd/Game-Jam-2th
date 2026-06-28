@@ -121,7 +121,10 @@ public class GameManager : MonoBehaviour
         if (CurrentDay >= MaxDay)
         {
             Debug.Log("Game Over: You Win!");
+            UIManager.TriggerYouWin();
+            currentDay = 1;
             CleanupGame();
+            ReloadActiveScene();
             return;
         }
 
@@ -133,20 +136,25 @@ public class GameManager : MonoBehaviour
 
     private void Update()
     {
+        bool nextDayPressed = false;
 #if ENABLE_INPUT_SYSTEM
         if (UnityEngine.InputSystem.Keyboard.current != null && UnityEngine.InputSystem.Keyboard.current.nKey.wasPressedThisFrame)
         {
-            Debug.Log("[Debug] Direct transition to the next day triggered.");
-            WinGame();
+            nextDayPressed = true;
         }
 #endif
 #if ENABLE_LEGACY_INPUT_MANAGER
-        if (Input.GetKeyDown(KeyCode.N))
+        if (!nextDayPressed && Input.GetKeyDown(KeyCode.N))
+        {
+            nextDayPressed = true;
+        }
+#endif
+
+        if (nextDayPressed)
         {
             Debug.Log("[Debug] Direct transition to the next day triggered.");
             WinGame();
         }
-#endif
     }
 
     public void CleanupGame()
