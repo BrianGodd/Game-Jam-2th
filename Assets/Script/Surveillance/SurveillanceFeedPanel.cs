@@ -1,6 +1,7 @@
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using System;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -11,6 +12,8 @@ namespace Surveillance
     {
         [SerializeField] private RawImage feedImage;
         [SerializeField] private TMP_Text cameraLabel;
+        private SurveillanceCamera displayedCamera;
+        private string lastTimestampText;
 
 #if ENABLE_INPUT_SYSTEM
         [SerializeField] private InputActionReference shiftLeftAction;
@@ -45,6 +48,16 @@ namespace Surveillance
 #endif
         }
 
+        private void Update()
+        {
+            RefreshCameraLabel();
+
+            if(Input.GetKeyDown(KeyCode.Q))
+            {
+                transform.root.gameObject.SetActive(false);
+            }
+        }
+
         [ContextMenu("Shift Left")]
         public void ShiftLeft()
         {
@@ -64,10 +77,33 @@ namespace Surveillance
 
         private void RefreshDisplay(SurveillanceCamera camera)
         {
-            if (cameraLabel != null)
+            displayedCamera = camera;
+            lastTimestampText = null;
+            RefreshCameraLabel();
+        }
+
+        private void RefreshCameraLabel()
+        {
+            if (cameraLabel == null)
             {
-                cameraLabel.text = camera != null ? camera.CameraLabel : "No Signal";
+                return;
             }
+
+            if (displayedCamera == null)
+            {
+                cameraLabel.text = "No Signal";
+                return;
+            }
+
+            string timestampText = DateTime.Now.ToString("yyyy/MM/dd  HH:mm:ss");
+            if (timestampText == lastTimestampText)
+            {
+                return;
+            }
+
+            int cameraNumber = SurveillanceManager.Instance.CurrentCameraIndex + 1;
+            cameraLabel.text = $"{timestampText}\nCAM{cameraNumber} {displayedCamera.CameraLabel}";
+            lastTimestampText = timestampText;
         }
 
 #if ENABLE_INPUT_SYSTEM
