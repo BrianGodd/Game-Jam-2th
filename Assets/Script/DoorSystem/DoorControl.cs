@@ -153,6 +153,16 @@ namespace DoorSystem
             }
         }
 
+        public bool CanToggleOpen()
+        {
+            return doorState == DoorState.Closed || doorState == DoorState.Opened;
+        }
+
+        public bool CanToggleLock()
+        {
+            return doorState == DoorState.Closed || doorState == DoorState.Locked;
+        }
+
         #endregion
 
         #region State Checkers
