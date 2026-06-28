@@ -5,7 +5,7 @@ using static DoorSystem.DoorControl.DoorState;
 
 public class LevelOneObjective : GameObjective
 {
-    public override bool IsComplete()
+    public override bool IsCompleted()
     {
         DoorState notLocked = ~Locked;
         bool AllDoorsLocked = !DoorManager.Instance.HasDoorWithState(notLocked);
@@ -15,6 +15,6 @@ public class LevelOneObjective : GameObjective
     [ContextMenu("Check Completion Status")]
     private void CheckComplete()
     {
-        Debug.Log($"[LevelOneObjective] Checking completion status: {IsComplete()}");
+        Debug.Log($"[LevelOneObjective] Checking completion status: {IsCompleted()}");
     }
 }

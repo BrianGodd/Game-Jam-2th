@@ -4,5 +4,5 @@ using UnityEngine;
 
 public abstract class GameObjective : MonoBehaviour
 {
-    public abstract bool IsComplete();
+    public abstract bool IsCompleted();
 }
