@@ -20,6 +20,7 @@ public class GameManager : MonoBehaviour
     }
 
     [SerializeField] private float gameLengthMinutes = 5;
+    [SerializeField] private GameObjective gameObjective;
 
     [Header("Runtime")]
     [SerializeField] private float timeCompleteness = 0f;
@@ -51,9 +52,7 @@ public class GameManager : MonoBehaviour
         yield return gameTimer;
 
         // Game time over. check if all missions are completed
-
-        bool missionCompleted = !MissionManager.Instance.HasIncompleteMission;
-        if(missionCompleted)
+        if(gameObjective.IsCompleted())
         {
             WinGame();
         }
