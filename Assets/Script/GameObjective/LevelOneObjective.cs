@@ -13,8 +13,10 @@ public class LevelOneObjective : GameObjective
     public override bool IsCompleted()
     {
         DoorState notLocked = ~Locked;
-        bool allDoorsLocked = !DoorManager.Instance.HasDoorWithState(notLocked);
-        bool allLightsOff = !LightSwitchManager.Instance.HasSwitchOn();
+        int doorCount = DoorManager.Instance.Doors.Count;
+        int switchCount = LightSwitchManager.Instance.LightSwitches.Count;
+        bool allDoorsLocked = doorCount > 0 && !DoorManager.Instance.HasDoorWithState(notLocked);
+        bool allLightsOff = switchCount > 0 && !LightSwitchManager.Instance.HasSwitchOn();
         return allDoorsLocked && allLightsOff;
     }
 
