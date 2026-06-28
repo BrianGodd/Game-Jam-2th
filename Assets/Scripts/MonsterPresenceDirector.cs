@@ -14,6 +14,9 @@ namespace Horror
         public StarterAssets.FirstPersonController playerController;
         public Transform[] stalkPoints;
         public Transform[] hidePoints;
+        public Animator monsterAnimator;
+        [Tooltip("修正模型朝向的旋轉偏移量（若模型背對玩家，請設為 180）")]
+        public float rotationOffset = 180f;
 
         [Header("Stalking Settings")]
         public float firstDelay = 8f;
@@ -32,6 +35,8 @@ namespace Horror
         public float walkThreatRate = 8f;
         public float runThreatRate = 20f;
         public float threatDecayRate = 4f;
+        public float jumpThreat = 10f;
+        public float landThreat = 15f;
         [Range(0f, 1f)]
         public float chaseChance = 0.5f;
         public float soundDetectionThreshold = 75f;
@@ -54,11 +59,18 @@ namespace Horror
         public AudioSource jumpscareAudioSource;
         public AudioClip jumpscareClip;
         public float jumpscareDuration = 2.5f;
-        public float jumpscareHeightOffset = -0.5f;
+        public Vector3 jumpscareOffset = new Vector3(0f, -0.5f, 1.0f);
         public float jumpscareShakeIntensity = 3.0f; // maximum rotation shake in degrees
         public float jumpscarePositionalShake = 0.05f; // maximum position shake offset in meters
 
+        [Header("Body Shake")]
+        public float bodyShakeIntensity = 0.03f; // position offset in meters
+        public float bodyShakeSpeed = 25f; // Perlin noise speed
+
         private Vector3 jumpscareCameraBaseLocalPos;
+        private Quaternion jumpscareCameraBaseRot;
+        private Vector3 jumpscareMonsterBasePos;
+        private float bodyShakeSeed;
 
         public enum MonsterState
         {
@@ -87,6 +99,7 @@ namespace Horror
         private Transform targetPoint;
         private int currentPairIndex = -1;
         private NavMeshAgent agent;
+        private bool wasGrounded = true;
 
         private void Awake()
         {
@@ -97,6 +110,16 @@ namespace Horror
 
             agent = monsterObject.GetComponent<NavMeshAgent>();
             agent.updateRotation = false; // FacePlayer handles rotation manually
+
+            if (monsterAnimator == null && monsterObject != null)
+            {
+                monsterAnimator = monsterObject.GetComponent<Animator>();
+            }
+
+            if (monsterAnimator != null)
+            {
+                monsterAnimator.enabled = true;
+            }
 
             if (playerController == null)
             {
@@ -111,18 +134,21 @@ namespace Horror
 
             currentPairIndex = Random.Range(0, Mathf.Min(stalkPoints.Length, hidePoints.Length));
             targetPoint = hidePoints[currentPairIndex];
-            monsterObject.transform.SetPositionAndRotation(targetPoint.position, targetPoint.rotation);
+            monsterObject.transform.SetPositionAndRotation(targetPoint.position, targetPoint.rotation * Quaternion.Euler(0, rotationOffset, 0));
             monsterObject.SetActive(false);
             state = MonsterState.Hidden;
             stateEnterTime = Time.time;
             nextSightingTime = Time.time + firstDelay;
+            bodyShakeSeed = Random.Range(0f, 1000f);
+            wasGrounded = playerController != null ? playerController.Grounded : true;
         }
 
         private void Update()
         {
-            // Calculate player movement state
             bool isMoving = false;
             bool isRunning = false;
+            bool playerJustJumped = false;
+            bool playerJustLanded = false;
 
             var inputs = playerController.GetComponent<StarterAssets.StarterAssetsInputs>();
             var cc = playerController.GetComponent<CharacterController>();
@@ -133,6 +159,16 @@ namespace Horror
                     isMoving = true;
                     isRunning = inputs.sprint;
                 }
+
+                if (wasGrounded && !playerController.Grounded && inputs.jump)
+                {
+                    playerJustJumped = true;
+                }
+                else if (!wasGrounded && playerController.Grounded)
+                {
+                    playerJustLanded = true;
+                }
+                wasGrounded = playerController.Grounded;
             }
 
             // Update Threat based on movement (bypass during Chase/Jumpscare/Search to allow proper state behaviors)
@@ -147,7 +183,20 @@ namespace Horror
                 {
                     threat -= Time.deltaTime * threatDecayRate;
                 }
-                threat = Mathf.Clamp(threat, 0f, 100f);
+
+                if (playerJustJumped)
+                {
+                    threat += jumpThreat;
+                    Debug.Log($"[Monster] Player jumped! Threat +{jumpThreat}. Current threat: {threat:F1}");
+                }
+
+                if (playerJustLanded)
+                {
+                    threat += landThreat;
+                    Debug.Log($"[Monster] Player landed! Threat +{landThreat}. Current threat: {threat:F1}");
+                }
+
+                threat = Mathf.Max(threat, 0f);
             }
 
             if (state == MonsterState.Hidden)
@@ -164,6 +213,9 @@ namespace Horror
             {
                 FacePlayer();
             }
+
+            // --- Continuous body shake (unsettling vibration) ---
+            ApplyBodyShake();
 
             switch (state)
             {
@@ -192,6 +244,7 @@ namespace Horror
                             stateEnterTime = Time.time;
                             hideTime = Time.time + stayDuration;
                             agent.ResetPath();
+                            PlayAnimation("Idle");
                             Debug.Log($"[Monster] Reached StalkPoint. Standing still for {stayDuration}s...");
                         }
                     }
@@ -247,7 +300,10 @@ namespace Horror
                         agent.destination = playerPos;
                     }
 
-                    float distance = Vector3.Distance(monsterObject.transform.position, playerCamera.transform.position);
+                    Vector3 flatMonster = new Vector3(monsterObject.transform.position.x, 0f, monsterObject.transform.position.z);
+                    Vector3 flatPlayer = new Vector3(playerController.transform.position.x, 0f, playerController.transform.position.z);
+                    float distance = Vector3.Distance(flatMonster, flatPlayer);
+
                     if (distance <= attackDistance)
                     {
                         StartJumpscare();
@@ -286,7 +342,7 @@ namespace Horror
                             moveDir.y = 0f;
                             if (moveDir.sqrMagnitude > 0.001f)
                             {
-                                monsterObject.transform.rotation = Quaternion.LookRotation(moveDir, Vector3.up);
+                                monsterObject.transform.rotation = Quaternion.LookRotation(moveDir, Vector3.up) * Quaternion.Euler(0, rotationOffset, 0);
                             }
                         }
 
@@ -343,19 +399,13 @@ namespace Horror
                     );
                     playerCamera.transform.localPosition = jumpscareCameraBaseLocalPos + randomOffset;
 
-                    // Apply rotational shake on top of looking at monster's face
-                    Vector3 lookTarget = monsterObject.transform.position + Vector3.up * 1.5f;
-                    Vector3 lookDir = (lookTarget - playerCamera.transform.position).normalized;
-                    if (lookDir.sqrMagnitude > 0.001f)
-                    {
-                        Quaternion baseRot = Quaternion.LookRotation(lookDir);
-                        Quaternion shakeRot = Quaternion.Euler(
-                            Random.Range(-jumpscareShakeIntensity, jumpscareShakeIntensity),
-                            Random.Range(-jumpscareShakeIntensity, jumpscareShakeIntensity),
-                            Random.Range(-jumpscareShakeIntensity, jumpscareShakeIntensity)
-                        );
-                        playerCamera.transform.rotation = baseRot * shakeRot;
-                    }
+                    // Apply rotational shake on top of looked-at base rotation
+                    Quaternion shakeRot = Quaternion.Euler(
+                        Random.Range(-jumpscareShakeIntensity, jumpscareShakeIntensity),
+                        Random.Range(-jumpscareShakeIntensity, jumpscareShakeIntensity),
+                        Random.Range(-jumpscareShakeIntensity, jumpscareShakeIntensity)
+                    );
+                    playerCamera.transform.rotation = jumpscareCameraBaseRot * shakeRot;
 
                     if (Time.time >= jumpscareEndTime)
                     {
@@ -388,6 +438,7 @@ namespace Horror
                 agent.speed = moveSpeed;
                 agent.destination = targetPoint.position;
                 state = MonsterState.MovingToStalk;
+                PlayAnimation("PeaceWalking");
                 Debug.Log($"[Monster] Spawned. Moving from HidePoint[{currentPairIndex}] to StalkPoint[{currentPairIndex}]. Threat: {threat:F1}");
             }
         }
@@ -400,6 +451,7 @@ namespace Horror
             monsterObject.SetActive(true);
             agent.speed = initialChaseSpeed;
             agent.destination = playerCamera.transform.position;
+            PlayAnimation("FastWalking");
             Debug.LogWarning($"[Monster] CHASE started! Speed: {initialChaseSpeed:F1}. Threat: {threat:F1}");
         }
 
@@ -410,6 +462,7 @@ namespace Horror
             searchEndTime = 0f;
             agent.speed = moveSpeed;
             agent.destination = lastSeenPosition;
+            PlayAnimation("Walking");
             Debug.Log($"[Monster] Lost player (LOS blocked & Threat {threat:F1} < {soundDetectionThreshold:F1}). Searching last seen position: {lastSeenPosition}");
         }
 
@@ -427,6 +480,7 @@ namespace Horror
 
             agent.speed = moveSpeed;
             agent.destination = destination;
+            PlayAnimation("PeaceWalking");
             Debug.Log($"[Monster] Player outran the monster. Backing away for {escapeDuration}s...");
         }
 
@@ -436,10 +490,17 @@ namespace Horror
             stateEnterTime = Time.time;
             threat = 0f;
             jumpscareEndTime = Time.time + jumpscareDuration;
+            
+            if (monsterAnimator != null)
+            {
+                monsterAnimator.enabled = false; // 凍結所有骨骼動畫，保持最後捕捉玩家時的動作
+            }
+
             Debug.LogWarning($"[Monster] JUMPSCARE triggered! Caught player!");
 
-            // Cache camera base local position to apply shakes without permanent drift
+            // Cache camera base local position and rotation
             jumpscareCameraBaseLocalPos = playerCamera.transform.localPosition;
+            jumpscareCameraBaseRot = playerCamera.transform.rotation;
 
             // Disable CinemachineBrain to allow manual camera control/shake
             var brain = playerCamera.GetComponent<CinemachineBrain>();
@@ -469,13 +530,17 @@ namespace Horror
                 agent.enabled = false;
             }
 
-            // Position monster in front of camera
-            Vector3 facePos = playerCamera.transform.position + playerCamera.transform.forward * 1.0f;
-            facePos.y = playerCamera.transform.position.y + jumpscareHeightOffset;
-            monsterObject.transform.position = facePos;
-            monsterObject.transform.LookAt(playerCamera.transform.position);
+            // Position and rotate monster to face the camera exactly using jumpscareOffset
+            Vector3 spawnPos = playerCamera.transform.TransformPoint(jumpscareOffset);
+            jumpscareMonsterBasePos = spawnPos;
+            monsterObject.transform.position = spawnPos;
 
-            playerCamera.transform.LookAt(monsterObject.transform.position + Vector3.up * 1.5f);
+            Vector3 dirToPlayer = playerCamera.transform.position - spawnPos;
+            dirToPlayer.y = 0f; // Keep upright
+            if (dirToPlayer.sqrMagnitude > 0.001f)
+            {
+                monsterObject.transform.rotation = Quaternion.LookRotation(dirToPlayer, Vector3.up) * Quaternion.Euler(0, rotationOffset, 0);
+            }
 
             if (jumpscareAudioSource != null && jumpscareClip != null)
             {
@@ -567,11 +632,32 @@ namespace Horror
                 && viewportPoint.y <= 1f;
         }
 
+        private void ApplyBodyShake()
+        {
+            if (bodyShakeIntensity <= 0f) return;
+
+            float intensity = bodyShakeIntensity;
+            if (state == MonsterState.Chasing)
+                intensity *= 3f;
+            else if (state == MonsterState.Jumpscare)
+                intensity *= 3f; // Keep it shaking violently during jumpscare
+
+            float t = Time.time * bodyShakeSpeed;
+            float offsetX = (Mathf.PerlinNoise(t, bodyShakeSeed) - 0.5f) * 2f * intensity;
+            float offsetY = (Mathf.PerlinNoise(bodyShakeSeed, t) - 0.5f) * 2f * intensity;
+            float offsetZ = (Mathf.PerlinNoise(t + 50f, bodyShakeSeed + 50f) - 0.5f) * 2f * intensity;
+
+            // Apply as world-space offset on top of current base position (Agent or Jumpscare pivot)
+            Vector3 basePos = (state == MonsterState.Jumpscare) ? jumpscareMonsterBasePos : agent.nextPosition;
+            monsterObject.transform.position = basePos + new Vector3(offsetX, offsetY, offsetZ);
+        }
+
         private void FacePlayer()
         {
             Vector3 targetPosition = playerCamera.transform.position;
             targetPosition.y = monsterObject.transform.position.y;
             monsterObject.transform.LookAt(targetPosition);
+            monsterObject.transform.Rotate(0, rotationOffset, 0);
         }
 
         private void Retreat()
@@ -581,6 +667,15 @@ namespace Horror
             agent.destination = targetPoint.position;
             state = MonsterState.MovingToHide;
             stateEnterTime = Time.time;
+            PlayAnimation("PeaceWalking");
+        }
+
+        private void PlayAnimation(string stateName)
+        {
+            if (monsterAnimator != null)
+            {
+                monsterAnimator.Play(stateName);
+            }
         }
 
         private bool HasReachedPosition(Vector3 targetPos)

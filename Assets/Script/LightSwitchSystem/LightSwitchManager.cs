@@ -162,7 +162,7 @@ namespace LightSwitchSystem
         private void UpdateLightAnomaly()
         {
             MonsterPresenceDirector.MonsterState state = monsterDirector.CurrentState;
-            float threat = monsterDirector.threat; // 0..100
+            float threat = Mathf.Clamp(monsterDirector.threat, 0f, 100f);
             float dt = Time.deltaTime;
 
             // Jumpscare: instant total blackout
