@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 8211034682506121527}
   - component: {fileID: 1841237632159356295}
   - component: {fileID: 957614524117434691}
+  - component: {fileID: 1783651192034567890}
   m_Layer: 0
   m_Name: Ceiling Light
   m_TagString: Untagged
@@ -109,6 +110,19 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   debug: 1
+--- !u!114 &1783651192034567890
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4789936396316217191}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f27fc8afc4754a64abfcf89b573b559b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  interactKeyText: E
 --- !u!1 &5210574598823997957
 GameObject:
   m_ObjectHideFlags: 0
