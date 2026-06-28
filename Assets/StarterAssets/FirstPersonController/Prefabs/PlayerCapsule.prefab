@@ -216,6 +216,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   MoveSpeed: 4
   SprintSpeed: 6
+  CrouchHeight: 1
+  CrouchTransitionSpeed: 8
+  CrouchObstructionLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
   RotationSpeed: 1
   SpeedChangeRate: 10
   JumpHeight: 1.2
@@ -264,6 +269,7 @@ MonoBehaviour:
   look: {x: 0, y: 0}
   jump: 0
   sprint: 0
+  crouch: 0
   analogMovement: 0
   cursorLocked: 1
   cursorInputForLook: 1
