@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
 
@@ -18,30 +16,43 @@ public class Interactable : MonoBehaviour
     public UnityEvent OnRaycastExit;
 
     [Header("Interact Events")]
-    [Tooltip("Invoked when the interact input is performed while this object is targeted.")]
+    [Tooltip("Invoked on a quick interact press while this object is targeted.")]
     public UnityEvent OnInteract;
 
-    /// <summary>
-    /// Called by an interactor when a raycast starts hitting this object.
-    /// </summary>
+    [Tooltip("Invoked after the interact input has been held for the interactor's hold duration.")]
+    public UnityEvent OnHoldInteract;
+
+    public bool debug = false;
+
     public void RaycastEnter()
     {
+        if (debug)
+            Debug.Log($"[{gameObject.name}|{name}]: RaycastEnter called on " + gameObject.name);
+
         OnRaycastEnter?.Invoke();
     }
 
-    /// <summary>
-    /// Called by an interactor when a raycast stops hitting this object.
-    /// </summary>
     public void RaycastExit()
     {
+        if (debug)
+            Debug.Log($"[{gameObject.name}|{name}]: RaycastExit called on " + gameObject.name);
+
         OnRaycastExit?.Invoke();
     }
 
-    /// <summary>
-    /// Called by an interactor when the interact input is triggered while this object is targeted.
-    /// </summary>
     public void Interact()
     {
+        if (debug)
+            Debug.Log($"[{gameObject.name}|{name}]: Interact called on " + gameObject.name);
+
         OnInteract?.Invoke();
+    }
+
+    public void HoldInteract()
+    {
+        if (debug)
+            Debug.Log($"[{gameObject.name}|{name}]: HoldInteract called on " + gameObject.name);
+
+        OnHoldInteract?.Invoke();
     }
 }

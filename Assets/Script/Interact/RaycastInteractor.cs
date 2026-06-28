@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
@@ -7,14 +5,11 @@ using UnityEngine.InputSystem;
 
 /// <summary>
 /// Continuously casts a ray from a camera (or specified origin) to detect Interactable components.
-/// The component raises enter/exit events on targeted Interactable objects and triggers their interact event when the interact input is pressed.
+/// The component raises enter/exit events on targeted Interactable objects and triggers their interact events from input.
+/// Quick press triggers Interactable.OnInteract. When Hold Interact Duration is greater than zero,
+/// holding for that duration triggers OnHoldInteract; releasing sooner triggers OnInteract instead.
 /// Requires the new Input System; this component will log an error and disable itself when the project is not using it.
 /// When an InputActionReference is not assigned, this component will attempt to find an action named "Interact" on a PlayerInput component on the same GameObject.
-///
-/// Style & safety notes:
-/// - Prefer TryGetComponent&lt;T&gt; when a component may be missing; use RequireComponent only when a dependency is mandatory.
-/// - Avoid leading underscores in field names to follow common Unity conventions and inspector expectations.
-/// - This script uses TryGetComponent to detect PlayerInput and interactable targets.
 /// </summary>
 public class RaycastInteractor : MonoBehaviour
 {
@@ -32,14 +27,19 @@ public class RaycastInteractor : MonoBehaviour
 #if ENABLE_INPUT_SYSTEM
     [Tooltip("Optional Input Action Reference to an 'Interact' action. If not assigned, the script will try to find a 'Interact' action on a PlayerInput component on the same GameObject.")]
     [SerializeField] private InputActionReference interactAction;
+
+    [Tooltip("Seconds the interact input must be held before triggering OnHoldInteract. 0 uses quick press only.")]
+    [SerializeField] private float holdInteractDuration = 2 ;
 #endif
 
-    // Currently targeted interactable by the raycast.
     private Interactable current;
 
 #if ENABLE_INPUT_SYSTEM
-    // The runtime InputAction we subscribe to (from the reference or found on PlayerInput).
     private InputAction runtimeAction;
+    private bool isInteractHeld;
+    private float holdElapsed;
+    private Interactable holdTarget;
+    private bool holdTriggered;
 #endif
 
     private void OnEnable()
@@ -49,25 +49,24 @@ public class RaycastInteractor : MonoBehaviour
         enabled = false;
         return;
 #else
-        // Prefer the serialized InputActionReference when provided.
         if (interactAction != null && interactAction.action != null)
         {
             runtimeAction = interactAction.action;
         }
-        else
+        else if (TryGetComponent<PlayerInput>(out var playerInput) && playerInput.actions != null)
         {
-            // Try to locate a PlayerInput on this GameObject and find an action named "Interact".
-            if (TryGetComponent<PlayerInput>(out var playerInput) 
-                && playerInput.actions != null)
-            {
-                runtimeAction = playerInput.actions.FindAction("Interact", false);
-            }
+            runtimeAction = playerInput.actions.FindAction("Interact", false);
         }
 
         if (runtimeAction != null)
         {
+            runtimeAction.started += OnInteractStarted;
+            runtimeAction.canceled += OnInteractCanceled;
             runtimeAction.performed += OnInteractPerformed;
-            if (!runtimeAction.enabled) runtimeAction.Enable();
+            if (!runtimeAction.enabled)
+            {
+                runtimeAction.Enable();
+            }
         }
         else
         {
@@ -81,29 +80,95 @@ public class RaycastInteractor : MonoBehaviour
 #if ENABLE_INPUT_SYSTEM
         if (runtimeAction != null)
         {
+            runtimeAction.started -= OnInteractStarted;
+            runtimeAction.canceled -= OnInteractCanceled;
             runtimeAction.performed -= OnInteractPerformed;
             runtimeAction = null;
         }
+
+        CancelHoldInteract();
 #endif
     }
 
     private void Update()
     {
-        // Constantly perform the raycast to detect enter/exit on Interactable components.
         PerformRaycast();
+#if ENABLE_INPUT_SYSTEM
+        UpdateHoldInteract();
+#endif
     }
 
 #if ENABLE_INPUT_SYSTEM
+    private void OnInteractStarted(InputAction.CallbackContext ctx)
+    {
+        if (current == null || holdInteractDuration <= 0f)
+        {
+            return;
+        }
+
+        isInteractHeld = true;
+        holdElapsed = 0f;
+        holdTarget = current;
+        holdTriggered = false;
+    }
+
+    private void OnInteractCanceled(InputAction.CallbackContext ctx)
+    {
+        if (isInteractHeld && !holdTriggered && holdTarget != null && holdInteractDuration > 0f)
+        {
+            holdTarget.Interact();
+        }
+
+        CancelHoldInteract();
+    }
+
     private void OnInteractPerformed(InputAction.CallbackContext ctx)
     {
-        if (current != null) current.Interact();
+        if (current == null || holdInteractDuration > 0f)
+        {
+            return;
+        }
+
+        current.Interact();
+    }
+
+    private void UpdateHoldInteract()
+    {
+        if (!isInteractHeld || holdTarget == null || holdInteractDuration <= 0f)
+        {
+            return;
+        }
+
+        if (current != holdTarget)
+        {
+            CancelHoldInteract();
+            return;
+        }
+
+        holdElapsed += Time.deltaTime;
+        if (!holdTriggered && holdElapsed >= holdInteractDuration)
+        {
+            holdTriggered = true;
+            holdTarget.HoldInteract();
+        }
+    }
+
+    private void CancelHoldInteract()
+    {
+        isInteractHeld = false;
+        holdElapsed = 0f;
+        holdTarget = null;
+        holdTriggered = false;
     }
 #endif
 
     private void PerformRaycast()
     {
         Camera cam = originCamera != null ? originCamera : Camera.main;
-        if (cam == null) return;
+        if (cam == null)
+        {
+            return;
+        }
 
         Vector3 origin = cam.transform.position;
         Vector3 dir = cam.transform.forward;
@@ -112,18 +177,21 @@ public class RaycastInteractor : MonoBehaviour
         {
             if (hit.collider != null && hit.collider.TryGetComponent<Interactable>(out Interactable found))
             {
-                // If we started targeting a new interactable, notify enter and exit appropriately.
                 if (found != current)
                 {
-                    if (current != null) current.RaycastExit();
+                    if (current != null)
+                    {
+                        current.RaycastExit();
+                    }
+
                     current = found;
                     current.RaycastEnter();
                 }
+
                 return;
             }
         }
 
-        // No valid interactable hit this frame: if we previously had one, notify exit.
         if (current != null)
         {
             current.RaycastExit();
@@ -134,7 +202,11 @@ public class RaycastInteractor : MonoBehaviour
     private void OnDrawGizmosSelected()
     {
         Camera cam = originCamera != null ? originCamera : Camera.main;
-        if (cam == null) return;
+        if (cam == null)
+        {
+            return;
+        }
+
         Gizmos.color = Color.yellow;
         Gizmos.DrawLine(cam.transform.position, cam.transform.position + cam.transform.forward * maxDistance);
     }
