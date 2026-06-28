@@ -75,10 +75,23 @@ public class GameManager : MonoBehaviour
     IEnumerator MainGameLoop()
     {
         var gameTimer = StartCoroutine(GameTimer());
+
+        float gameLengthSeconds = gameLengthMinutes * 60f;
+        while (elapsedTimeSeconds < gameLengthSeconds)
+        {
+            if (gameObjective.IsCompleted())
+            {
+                StopCoroutine(gameTimer);
+                WinGame();
+                yield break;
+            }
+            yield return null;
+        }
+
         yield return gameTimer;
 
         // Game time over. check if all missions are completed
-        if(gameObjective.IsCompleted())
+        if (gameObjective.IsCompleted())
         {
             WinGame();
         }
@@ -90,8 +103,14 @@ public class GameManager : MonoBehaviour
         // don't put any logic after this point in the main game loop
     }
 
-    public void LoseGame()
+    public void LoseGame(bool playJumpscare = true)
     {
+        if (playJumpscare)
+        {
+            Horror.MonsterPresenceDirector.Instance.StartJumpscare();
+            return;
+        }
+
         Debug.Log($"Day {CurrentDay}: You Lose!");
         CleanupGame();
         ReloadActiveScene();
@@ -110,6 +129,24 @@ public class GameManager : MonoBehaviour
         Debug.Log($"Day {currentDay - 1} complete. Loading Day {currentDay}.");
         CleanupGame();
         ReloadActiveScene();
+    }
+
+    private void Update()
+    {
+#if ENABLE_INPUT_SYSTEM
+        if (UnityEngine.InputSystem.Keyboard.current != null && UnityEngine.InputSystem.Keyboard.current.nKey.wasPressedThisFrame)
+        {
+            Debug.Log("[Debug] Direct transition to the next day triggered.");
+            WinGame();
+        }
+#endif
+#if ENABLE_LEGACY_INPUT_MANAGER
+        if (Input.GetKeyDown(KeyCode.N))
+        {
+            Debug.Log("[Debug] Direct transition to the next day triggered.");
+            WinGame();
+        }
+#endif
     }
 
     public void CleanupGame()

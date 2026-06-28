@@ -9,6 +9,8 @@ namespace Horror
 {
     public class MonsterPresenceDirector : MonoBehaviour
     {
+        public static MonsterPresenceDirector Instance { get; private set; }
+
         [Header("References")]
         public GameObject monsterObject;
         public Camera playerCamera;
@@ -40,6 +42,12 @@ namespace Horror
         public float landThreat = 15f;
         [Range(0f, 1f)]
         public float chaseChance = 0.5f;
+
+        [Range(0f, 1f)]
+        [Tooltip("Chase chance for Day 4 and onwards (default Day 3 is chaseChance).")]
+        public float chaseChanceDay4 = 0.8f;
+
+        private float CurrentChaseChance => GameManager.CurrentDay >= 4 ? chaseChanceDay4 : chaseChance;
         public float soundDetectionThreshold = 75f;
 
         [Header("Chase Settings")]
@@ -129,6 +137,7 @@ namespace Horror
 
         private void Awake()
         {
+            Instance = this;
             AutoAssignPointArrays();
 
             if (stalkPoints == null || stalkPoints.Length == 0 || hidePoints == null || hidePoints.Length == 0)
@@ -174,7 +183,7 @@ namespace Horror
 
         private void Update()
         {
-            if (GameManager.CurrentDay <= 0)
+            if (GameManager.CurrentDay <= 1)
             {
                 threat = 0f;
                 state = MonsterState.Hidden;
@@ -259,7 +268,7 @@ namespace Horror
                 case MonsterState.MovingToStalk:
                 case MonsterState.Stalking:
                     // Check dynamic chase trigger
-                    if (CanChaseToday() && threat >= threatThreshold && Random.value < chaseChance * Time.deltaTime)
+                    if (CanChaseToday() && threat >= threatThreshold && Random.value < CurrentChaseChance * Time.deltaTime)
                     {
                         Debug.Log($"[Monster] Dynamic trigger: Threat high ({threat:F1}). Transitioning to CHASE!");
                         StartChasing();
@@ -487,7 +496,7 @@ namespace Horror
                     if (Time.time >= jumpscareEndTime)
                     {
                         Debug.Log("[Monster] Jumpscare finished. Reloading scene...");
-                        GameManager.Instance.LoseGame();
+                        GameManager.Instance.LoseGame(false);
                     }
                     break;
             }
@@ -510,7 +519,7 @@ namespace Horror
             monsterObject.transform.position = hidePoint.position; // Manually sync transform when updatePosition is false
             stateEnterTime = Time.time;
 
-            if (CanChaseToday() && threat >= threatThreshold && Random.value < chaseChance)
+            if (CanChaseToday() && threat >= threatThreshold && Random.value < CurrentChaseChance)
             {
                 Debug.Log($"[Monster] Threat high ({threat:F1} >= {threatThreshold:F1}). Transitioning to CHASE immediately!");
                 StartChasing();
@@ -568,7 +577,7 @@ namespace Horror
 
         private bool CanChaseToday()
         {
-            return GameManager.CurrentDay >= 1;
+            return GameManager.CurrentDay >= 3;
         }
 
         private void StartBackingAway()
@@ -589,7 +598,7 @@ namespace Horror
             Debug.Log($"[Monster] Player outran the monster. Backing away for {escapeDuration}s...");
         }
 
-        private void StartJumpscare()
+        public void StartJumpscare()
         {
             state = MonsterState.Jumpscare;
             stateEnterTime = Time.time;
@@ -631,7 +640,10 @@ namespace Horror
             // Freeze monster NavMeshAgent
             if (agent != null)
             {
-                agent.ResetPath();
+                if (agent.isActiveAndEnabled && agent.isOnNavMesh)
+                {
+                    agent.ResetPath();
+                }
                 agent.enabled = false;
             }
 
@@ -809,6 +821,8 @@ namespace Horror
 
         private void TryOpenNearbyDoor(float chance)
         {
+            if (GameManager.CurrentDay < 4) return;
+
             if (Random.value > chance) return;
 
             Collider[] hits = Physics.OverlapSphere(monsterObject.transform.position, doorOpenRadius, doorDetectionLayers, QueryTriggerInteraction.Collide);

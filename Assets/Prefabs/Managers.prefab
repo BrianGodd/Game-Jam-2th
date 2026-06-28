@@ -319,9 +319,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2e1d5509313a1874980ca9293bc43218, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  gameLengthMinutes: 1
+  startingDay: 1
+  gameLengthMinutes: 2.5
   gameObjective: {fileID: 3249472782026233607}
   timeCompleteness: 0
+  elapsedTimeSeconds: 0
 --- !u!1 &5760578582517288468
 GameObject:
   m_ObjectHideFlags: 0

@@ -173,8 +173,8 @@ MonoBehaviour:
   landThreat: 50
   chaseChance: 1
   soundDetectionThreshold: 150
-  initialChaseSpeed: 8
-  finalChaseSpeed: 2
+  initialChaseSpeed: 10
+  finalChaseSpeed: 6.5
   speedDecayDuration: 5
   attackDistance: 1.5
   loseDistance: 10
