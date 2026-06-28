@@ -198,7 +198,8 @@ GameObject:
   m_Component:
   - component: {fileID: 6090240345492802338}
   - component: {fileID: 4030820382000731091}
-  - component: {fileID: 2308733680045778374}
+  - component: {fileID: 4460852453125314819}
+  - component: {fileID: 3731194935552810579}
   m_Layer: 0
   m_Name: Door Wall Opaque
   m_TagString: Untagged
@@ -236,7 +237,7 @@ Animator:
   m_GameObject: {fileID: 6090240345492802339}
   m_Enabled: 1
   m_Avatar: {fileID: 0}
-  m_Controller: {fileID: 9100000, guid: ef50a763d19f7f744acac49b80d929b1, type: 2}
+  m_Controller: {fileID: 9100000, guid: 8e2f89518e7deee48a32d327657d4412, type: 2}
   m_CullingMode: 0
   m_UpdateMode: 0
   m_ApplyRootMotion: 0
@@ -247,7 +248,7 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
---- !u!114 &2308733680045778374
+--- !u!114 &4460852453125314819
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -256,9 +257,72 @@ MonoBehaviour:
   m_GameObject: {fileID: 6090240345492802339}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 64247cfad3dcc704697fa9009c02548b, type: 3}
+  m_Script: {fileID: 11500000, guid: 27ccb891134d1214fb195a37b279072d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  animator: {fileID: 4030820382000731091}
+  doorState: 1
+  OnOpenStart:
+    m_PersistentCalls:
+      m_Calls: []
+  OnOpenEnd:
+    m_PersistentCalls:
+      m_Calls: []
+  OnCloseStart:
+    m_PersistentCalls:
+      m_Calls: []
+  OnCloseEnd:
+    m_PersistentCalls:
+      m_Calls: []
+--- !u!114 &3731194935552810579
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6090240345492802339}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dc0a79ec6e272bf429b3dbb5dcc11872, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  OnRaycastEnter:
+    m_PersistentCalls:
+      m_Calls: []
+  OnRaycastExit:
+    m_PersistentCalls:
+      m_Calls: []
+  OnInteract:
+    m_PersistentCalls:
+      m_Calls:
+      - m_Target: {fileID: 4460852453125314819}
+        m_TargetAssemblyTypeName: DoorSystem.DoorControl, Assembly-CSharp
+        m_MethodName: ToggleOpen
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
+  OnHoldInteract:
+    m_PersistentCalls:
+      m_Calls:
+      - m_Target: {fileID: 4460852453125314819}
+        m_TargetAssemblyTypeName: DoorSystem.DoorControl, Assembly-CSharp
+        m_MethodName: ToggleLock
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
+  debug: 1
 --- !u!1001 &732556957
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -489,6 +553,16 @@ PrefabInstance:
         type: 3}
       propertyPath: m_Center.y
       value: 2.3757885
+      objectReference: {fileID: 0}
+    - target: {fileID: 4495367371845594138, guid: 8b2ed08f82f4cea41907e2cf2f8938c5,
+        type: 3}
+      propertyPath: m_Size.x
+      value: 0.44293323
+      objectReference: {fileID: 0}
+    - target: {fileID: 4495367371845594138, guid: 8b2ed08f82f4cea41907e2cf2f8938c5,
+        type: 3}
+      propertyPath: m_Center.x
+      value: 1.0185328
       objectReference: {fileID: 0}
     - target: {fileID: 5944654773601380002, guid: 8b2ed08f82f4cea41907e2cf2f8938c5,
         type: 3}

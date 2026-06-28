@@ -1,3 +1,4 @@
+using System.Globalization;
 using UnityEngine;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
@@ -173,9 +174,15 @@ public class RaycastInteractor : MonoBehaviour
         Vector3 origin = cam.transform.position;
         Vector3 dir = cam.transform.forward;
 
-        if (Physics.Raycast(origin, dir, out RaycastHit hit, maxDistance, interactLayers, QueryTriggerInteraction.Ignore))
+        if (Physics.Raycast(origin, dir, out RaycastHit hit, maxDistance, interactLayers, QueryTriggerInteraction.Ignore)
+            && hit.collider != null)
         {
-            if (hit.collider != null && hit.collider.TryGetComponent<Interactable>(out Interactable found))
+            if(!hit.collider.TryGetComponent<Interactable>(out var found))
+            {
+                found = hit.collider.GetComponentInParent<Interactable>();
+            }
+
+            if(found != null)
             {
                 if (found != current)
                 {
@@ -183,11 +190,9 @@ public class RaycastInteractor : MonoBehaviour
                     {
                         current.RaycastExit();
                     }
-
                     current = found;
                     current.RaycastEnter();
                 }
-
                 return;
             }
         }
