@@ -1,5 +1,6 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.Events;
 
 namespace DoorSystem
 {
@@ -7,12 +8,31 @@ namespace DoorSystem
     {
         private static readonly int CloseHash = Animator.StringToHash("Close");
         private static readonly int OpenHash = Animator.StringToHash("Open");
+        private static readonly int DoorOpenStateHash = Animator.StringToHash("Door_Open");
+        private static readonly int DoorCloseStateHash = Animator.StringToHash("Door_Close");
 
         #region Serialized Fields
 
-        [SerializeField] private Collider doorCollider;
         [SerializeField] private Animator animator;
         [SerializeField] private DoorState doorState = DoorState.Closed;
+
+        #endregion
+
+        #region Events
+
+        [Header("Open Events")]
+        [Tooltip("Invoked when the door begins opening.")]
+        public UnityEvent OnOpenStart;
+
+        [Tooltip("Invoked when the door finishes opening.")]
+        public UnityEvent OnOpenEnd;
+
+        [Header("Close Events")]
+        [Tooltip("Invoked when the door begins closing.")]
+        public UnityEvent OnCloseStart;
+
+        [Tooltip("Invoked when the door finishes closing.")]
+        public UnityEvent OnCloseEnd;
 
         #endregion
 
@@ -62,10 +82,17 @@ namespace DoorSystem
         {
             if (!IsClosable()) return;
 
+            if (waitStateRoutine != null)
+            {
+                StopCoroutine(waitStateRoutine);
+                waitStateRoutine = null;
+            }
+
             doorState = DoorState.Closing;
             animator.SetTrigger(CloseHash);
+            OnCloseStart?.Invoke();
 
-            waitStateRoutine = StartCoroutine(WaitForState(DoorState.Closed, "Closed"));
+            waitStateRoutine = StartCoroutine(WaitForMotionEnd(DoorCloseStateHash, DoorState.Closed, OnCloseEnd));
         }
 
         [ContextMenu("Open DoorControl")]
@@ -81,10 +108,9 @@ namespace DoorSystem
 
             doorState = DoorState.Opening;
             animator.SetTrigger(OpenHash);
+            OnOpenStart?.Invoke();
 
-            doorCollider.enabled = false;
-
-            waitStateRoutine = StartCoroutine(WaitForState(DoorState.Opened, "Opened"));
+            waitStateRoutine = StartCoroutine(WaitForMotionEnd(DoorOpenStateHash, DoorState.Opened, OnOpenEnd));
         }
 
         [ContextMenu("Lock DoorControl")]
@@ -171,15 +197,39 @@ namespace DoorSystem
 
         #region Private Methods
 
-        IEnumerator WaitForState(DoorState state, string stateName)
+        IEnumerator WaitForMotionEnd(int motionStateHash, DoorState finalState, UnityEvent endEvent)
         {
-            yield return new WaitUntil(() => animator.GetCurrentAnimatorStateInfo(0).IsName(stateName));
-            doorState = state;
+            yield return null;
 
-            if (doorState == DoorState.Closed)
+            yield return new WaitUntil(() =>
+                !animator.IsInTransition(0)
+                && animator.GetCurrentAnimatorStateInfo(0).shortNameHash == motionStateHash);
+
+            yield return new WaitUntil(() =>
             {
-                doorCollider.enabled = true;
+                if (animator.IsInTransition(0))
+                {
+                    return true;
+                }
+
+                AnimatorStateInfo info = animator.GetCurrentAnimatorStateInfo(0);
+                if (info.shortNameHash == motionStateHash)
+                {
+                    return info.normalizedTime >= 1f;
+                }
+
+                return true;
+            });
+
+            while (animator.IsInTransition(0))
+            {
+                yield return null;
             }
+
+            doorState = finalState;
+
+            endEvent?.Invoke();
+            waitStateRoutine = null;
         }
 
         #endregion
