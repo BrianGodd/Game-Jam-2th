@@ -31252,7 +31252,7 @@ PrefabInstance:
     - target: {fileID: 407000994181972073, guid: 3c34715dac22f7b43a6613253463fde6,
         type: 3}
       propertyPath: gameLengthMinutes
-      value: 4
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 2395528484080808110, guid: 3c34715dac22f7b43a6613253463fde6,
         type: 3}
