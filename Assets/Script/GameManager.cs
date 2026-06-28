@@ -24,8 +24,11 @@ public class GameManager : MonoBehaviour
 
     [Header("Runtime")]
     [SerializeField] private float timeCompleteness = 0f;
+    [SerializeField] private float elapsedTimeSeconds = 0f;
 
     public float TimeCompleteness => timeCompleteness;
+    public float ElapsedTimeSeconds => elapsedTimeSeconds;
+    public float RemainingTimeSeconds => Mathf.Max(0f, gameLengthMinutes * 60f - elapsedTimeSeconds);
 
     public event Action OnGameCleanup;
 
@@ -37,13 +40,16 @@ public class GameManager : MonoBehaviour
     IEnumerator GameTimer()
     {
         float gameLengthSeconds = gameLengthMinutes * 60f;
-        float elapsedTime = 0f;
-        while (elapsedTime < gameLengthSeconds)
+        elapsedTimeSeconds = 0f;
+        while (elapsedTimeSeconds < gameLengthSeconds)
         {
-            elapsedTime += Time.deltaTime;
-            timeCompleteness = elapsedTime / gameLengthSeconds;
+            elapsedTimeSeconds += Time.deltaTime;
+            timeCompleteness = elapsedTimeSeconds / gameLengthSeconds;
             yield return null;
         }
+
+        elapsedTimeSeconds = gameLengthSeconds;
+        timeCompleteness = 1f;
     }
     
     IEnumerator MainGameLoop()
