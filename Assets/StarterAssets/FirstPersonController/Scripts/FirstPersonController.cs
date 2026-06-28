@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -83,6 +83,20 @@ namespace StarterAssets
 				#else
 				return false;
 				#endif
+			}
+		}
+
+		public Vector3 Velocity
+		{
+			get
+			{
+				return _controller != null ? _controller.velocity : Vector3.zero;
+			}
+			set
+			{
+				Vector3 horizontalVelocity = new Vector3(value.x, 0.0f, value.z);
+				_speed = horizontalVelocity.magnitude;
+				_verticalVelocity = value.y;
 			}
 		}
 
