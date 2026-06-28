@@ -22,7 +22,7 @@ public class DoorControl : MonoBehaviour
         Opening,
         Locked
     }
-    DoorState doorState = DoorState.Closed;
+    [SerializeField] DoorState doorState = DoorState.Closed;
 
     [ContextMenu("Close DoorControl")]
     public void Close()
@@ -56,6 +56,7 @@ public class DoorControl : MonoBehaviour
         waitStateRoutine = StartCoroutine(WaitForState(DoorState.Opened, "Opened"));
     }
 
+
     [ContextMenu("Lock DoorControl")]
     public void Lock()
     {
@@ -72,6 +73,29 @@ public class DoorControl : MonoBehaviour
         Debug.Log($"[{name}|{transform.position}] is now unlocked");
     }
 
+    public void ToggleOpen()
+    {
+        if (doorState == DoorState.Closed)
+        {
+            Open();
+        }
+        else if (doorState == DoorState.Opened)
+        {
+            Close();
+        }
+    }
+
+    public void ToggleLock()
+    {
+        if(doorState == DoorState.Locked)
+        {
+            Unlock();
+        }
+        else if (doorState == DoorState.Closed)
+        {
+            Lock();
+        }
+    }
 
 
     #region State Checkers

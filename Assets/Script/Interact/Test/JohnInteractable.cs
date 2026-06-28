@@ -22,6 +22,11 @@ public class JohnInteractable : MonoBehaviour
         Debug.Log($"[{gameObject.name}|{name}]: OnLostFocus called on " + gameObject.name);
     }
 
+    public void OnHoldInteract()
+    {
+        Debug.Log($"[{gameObject.name}|{name}]: OnHoldInteract called on " + gameObject.name);
+    }
+
     private void Start()
     {
         if (!autoSetInteractable) return;
@@ -35,5 +40,6 @@ public class JohnInteractable : MonoBehaviour
         interactable.OnInteract.AddListener(Interact);
         interactable.OnRaycastEnter.AddListener(OnFocus);
         interactable.OnRaycastExit.AddListener(OnLostFocus);
+        interactable.OnHoldInteract.AddListener(OnHoldInteract);
     }
 }
