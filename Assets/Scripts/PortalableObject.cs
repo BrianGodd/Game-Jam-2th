@@ -23,10 +23,13 @@ public class PortalableObject : MonoBehaviour
         this.outPortal = outPortal;
     }
 
-    public virtual void ExitPortal()
+    public virtual void ExitPortal(Portal portal)
     {
-        this.inPortal = null;
-        this.outPortal = null;
+        if (inPortal == portal)
+        {
+            this.inPortal = null;
+            this.outPortal = null;
+        }
     }
 
     public virtual void Warp()

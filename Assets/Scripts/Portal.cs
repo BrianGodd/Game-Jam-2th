@@ -34,7 +34,7 @@ public class Portal : MonoBehaviour
         }
     }
 
-    private void Update()
+    private void LateUpdate()
     {
         if (OtherPortal == null || !OtherPortal.IsPlaced) return;
 
@@ -67,7 +67,7 @@ public class Portal : MonoBehaviour
         if (obj != null && portalObjects.Contains(obj))
         {
             portalObjects.Remove(obj);
-            obj.ExitPortal();
+            obj.ExitPortal(this);
         }
     }
 }
