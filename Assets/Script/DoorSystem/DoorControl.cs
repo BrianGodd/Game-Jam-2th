@@ -1,7 +1,8 @@
 using System.Collections;
-using Unity.AI.Navigation;
 using UnityEngine;
+using UnityEngine.AI;
 using UnityEngine.Events;
+using Horror;
 
 namespace DoorSystem
 {
@@ -59,10 +60,28 @@ namespace DoorSystem
         #region Runtime Fields
 
         private Coroutine waitStateRoutine;
+        private NavMeshObstacle[] navMeshObstacles;
 
         #endregion
 
         #region Unity Methods
+
+        private void Awake()
+        {
+            navMeshObstacles = GetComponentsInChildren<NavMeshObstacle>(true);
+            if (navMeshObstacles.Length == 0)
+            {
+                throw new MissingComponentException($"{name} requires a NavMeshObstacle in its hierarchy.");
+            }
+
+            for (int i = 0; i < navMeshObstacles.Length; i++)
+            {
+                navMeshObstacles[i].carving = true;
+                navMeshObstacles[i].carveOnlyStationary = false;
+            }
+
+            ApplyNavMeshObstacleState();
+        }
 
         private void Start()
         {
@@ -90,7 +109,9 @@ namespace DoorSystem
             }
 
             doorState = DoorState.Closing;
+            ApplyNavMeshObstacleState();
             animator.SetTrigger(CloseHash);
+            MonsterPresenceDirector.Instance.AddDoorThreat();
             OnCloseStart?.Invoke();
 
             waitStateRoutine = StartCoroutine(WaitForMotionEnd(DoorCloseStateHash, DoorState.Closed, OnCloseEnd));
@@ -108,6 +129,8 @@ namespace DoorSystem
             }
 
             doorState = DoorState.Opening;
+            ApplyNavMeshObstacleState();
+            MonsterPresenceDirector.Instance.ClearBlockedChasePosition();
             animator.SetTrigger(OpenHash);
             OnOpenStart?.Invoke();
 
@@ -119,6 +142,7 @@ namespace DoorSystem
         {
             if (!IsLockable()) return;
             doorState = DoorState.Locked;
+            ApplyNavMeshObstacleState();
             Debug.Log($"[{name}|{transform.position}] is now locked");
         }
 
@@ -127,6 +151,7 @@ namespace DoorSystem
         {
             if (!IsUnlockable()) return;
             doorState = DoorState.Closed;
+            ApplyNavMeshObstacleState();
             Debug.Log($"[{name}|{transform.position}] is now unlocked");
         }
 
@@ -238,52 +263,22 @@ namespace DoorSystem
             }
 
             doorState = finalState;
-            RefreshActiveNavMeshSurfaces();
+            ApplyNavMeshObstacleState();
 
             endEvent?.Invoke();
             waitStateRoutine = null;
         }
 
-        private static void RefreshActiveNavMeshSurfaces()
+        private void ApplyNavMeshObstacleState()
         {
-            IgnoreUnreadableNavMeshSources();
+            bool blocksNavMesh = doorState == DoorState.Closed
+                || doorState == DoorState.Closing
+                || doorState == DoorState.Locked;
 
-            for (int i = 0; i < NavMeshSurface.activeSurfaces.Count; i++)
+            for (int i = 0; i < navMeshObstacles.Length; i++)
             {
-                NavMeshSurface surface = NavMeshSurface.activeSurfaces[i];
-                if (surface.navMeshData == null) continue;
-
-                surface.UpdateNavMesh(surface.navMeshData);
+                navMeshObstacles[i].enabled = blocksNavMesh;
             }
-        }
-
-        private static void IgnoreUnreadableNavMeshSources()
-        {
-            MeshFilter[] meshFilters = FindObjectsByType<MeshFilter>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-            for (int i = 0; i < meshFilters.Length; i++)
-            {
-                IgnoreUnreadableNavMeshSource(meshFilters[i].gameObject, meshFilters[i].sharedMesh);
-            }
-
-            MeshCollider[] meshColliders = FindObjectsByType<MeshCollider>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-            for (int i = 0; i < meshColliders.Length; i++)
-            {
-                IgnoreUnreadableNavMeshSource(meshColliders[i].gameObject, meshColliders[i].sharedMesh);
-            }
-        }
-
-        private static void IgnoreUnreadableNavMeshSource(GameObject source, Mesh mesh)
-        {
-            if (mesh == null || mesh.isReadable) return;
-
-            NavMeshModifier modifier = source.GetComponent<NavMeshModifier>();
-            if (modifier == null)
-            {
-                modifier = source.AddComponent<NavMeshModifier>();
-            }
-
-            modifier.ignoreFromBuild = true;
-            modifier.applyToChildren = false;
         }
 
         #endregion

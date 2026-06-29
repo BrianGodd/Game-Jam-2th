@@ -159,7 +159,7 @@ MonoBehaviour:
   minInterval: 3
   maxInterval: 5
   stayDuration: 5
-  minStalkDistance: 3
+  minStalkDistance: 5
   maxStalkDistance: 20
   moveSpeed: 4
   vanishWhenLookedAt: 1
@@ -169,11 +169,11 @@ MonoBehaviour:
   walkThreatRate: 0
   runThreatRate: 10
   threatDecayRate: 5
-  jumpThreat: 20
+  jumpThreat: 15
   landThreat: 40
-  chaseChance: 0.5
-  chaseChanceDay4: 0.8
-  soundDetectionThreshold: 150
+  doorThreat: 20
+  chaseChancePerSecond: 0.5
+  chaseChancePerSecondDay4: 0.8
   initialChaseSpeed: 10
   finalChaseSpeed: 6.5
   speedDecayDuration: 5
@@ -188,17 +188,12 @@ MonoBehaviour:
   playerNavMeshSampleDistance: 4
   doorOpenRadius: 2
   chaseDoorOpenInterval: 0.25
-  stalkArrivalDoorOpenChance: 0.25
+  stalkArrivalDoorOpenChance: 0.5
   doorDetectionLayers:
     serializedVersion: 2
     m_Bits: 1
   escapeDistance: 8
   escapeDuration: 3
-  hideMinDistance: 5
-  headObstructionCheckDistance: 1.5
-  hidingObstructionLayers:
-    serializedVersion: 2
-    m_Bits: 4294967295
   jumpscareAudioSource: {fileID: 1432076826178936234}
   jumpscareClip: {fileID: 8300000, guid: c919fc13f1a28e545a1d87ddea344c87, type: 3}
   chaseClip: {fileID: 8300000, guid: 0c55c80d1922bda4a91b5a5bc6324f30, type: 3}

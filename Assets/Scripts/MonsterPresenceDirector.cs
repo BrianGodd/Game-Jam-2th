@@ -18,7 +18,7 @@ namespace Horror
         public Transform[] stalkPoints;
         public Transform[] hidePoints;
         public Animator monsterAnimator;
-        [Tooltip("修正模型朝向的旋轉偏移量（若模型背對玩家，請設為 180）")]
+        [Tooltip("Y-axis offset used when the monster model faces backwards.")]
         public float rotationOffset = 180f;
 
         [Header("Stalking Settings")]
@@ -40,15 +40,17 @@ namespace Horror
         public float threatDecayRate = 4f;
         public float jumpThreat = 10f;
         public float landThreat = 15f;
+        public float doorThreat = 12f;
         [Range(0f, 1f)]
-        public float chaseChance = 0.5f;
+        [UnityEngine.Serialization.FormerlySerializedAs("chaseChance")]
+        public float chaseChancePerSecond = 0.5f;
 
         [Range(0f, 1f)]
-        [Tooltip("Chase chance for Day 4 and onwards (default Day 3 is chaseChance).")]
-        public float chaseChanceDay4 = 0.8f;
+        [UnityEngine.Serialization.FormerlySerializedAs("chaseChanceDay4")]
+        [Tooltip("Chase chance per second for Day 4 and onwards.")]
+        public float chaseChancePerSecondDay4 = 0.8f;
 
-        private float CurrentChaseChance => GameManager.CurrentDay >= 4 ? chaseChanceDay4 : chaseChance;
-        public float soundDetectionThreshold = 75f;
+        private float CurrentChaseChancePerSecond => GameManager.CurrentDay >= 4 ? chaseChancePerSecondDay4 : chaseChancePerSecond;
 
         [Header("Chase Settings")]
         public float initialChaseSpeed = 8f;
@@ -130,7 +132,6 @@ namespace Horror
         private void Awake()
         {
             Instance = this;
-            AutoAssignPointArrays();
 
             if (stalkPoints == null || stalkPoints.Length == 0 || hidePoints == null || hidePoints.Length == 0)
             {
@@ -151,17 +152,6 @@ namespace Horror
                 monsterAnimator.enabled = true;
             }
 
-            if (playerController == null)
-            {
-                playerController = playerCamera.GetComponentInParent<StarterAssets.FirstPersonController>();
-                if (playerController == null)
-                {
-                    Debug.LogError("MonsterPresenceDirector: playerController is not assigned! Disabling script.", this);
-                    enabled = false;
-                    return;
-                }
-            }
-
             currentPairIndex = Random.Range(0, Mathf.Min(stalkPoints.Length, hidePoints.Length));
             targetPoint = hidePoints[currentPairIndex];
             monsterObject.transform.SetPositionAndRotation(targetPoint.position, targetPoint.rotation * Quaternion.Euler(0, rotationOffset, 0));
@@ -170,7 +160,7 @@ namespace Horror
             stateEnterTime = Time.time;
             nextSightingTime = Time.time + firstDelay;
             bodyShakeSeed = Random.Range(0f, 1000f);
-            wasGrounded = playerController != null ? playerController.Grounded : true;
+            wasGrounded = playerController.Grounded;
         }
 
         private void Update()
@@ -209,8 +199,8 @@ namespace Horror
                 wasGrounded = playerController.Grounded;
             }
 
-            // Update Threat based on movement (bypass during Chase/Jumpscare/Search to allow proper state behaviors)
-            if (state != MonsterState.Chasing && state != MonsterState.Searching && state != MonsterState.Jumpscare)
+            // Update Threat based on movement (bypass during Chase/Jumpscare to allow proper state behaviors)
+            if (state != MonsterState.Chasing && state != MonsterState.Jumpscare)
             {
                 if (isMoving)
                 {
@@ -260,14 +250,14 @@ namespace Horror
                 case MonsterState.MovingToStalk:
                 case MonsterState.Stalking:
                     // Check dynamic chase trigger
-                    if (CanChaseToday() && threat >= threatThreshold && Random.value < CurrentChaseChance * Time.deltaTime)
+                    if (CanChaseToday() && threat >= threatThreshold && Random.value < CurrentChaseChancePerSecond * Time.deltaTime)
                     {
                         Debug.Log($"[Monster] Dynamic trigger: Threat high ({threat:F1}). Transitioning to CHASE!");
                         StartChasing();
                         return;
                     }
                     // Check dynamic retreat trigger
-                    if (ShouldVanishNow())
+                    if (ShouldVanishNow() && (state != MonsterState.Stalking || Time.time < hideTime))
                     {
                         Debug.Log($"[Monster] Spotted by player! Retreating to HidePoint[{currentPairIndex}].");
                         Retreat();
@@ -303,6 +293,20 @@ namespace Horror
 
                         if (Time.time >= hideTime)
                         {
+                            if (CanChaseToday() && ShouldVanishNow())
+                            {
+                                Debug.LogWarning("[Monster] Player still sees monster after stalking. Starting CHASE!");
+                                StartChasing();
+                                return;
+                            }
+
+                            if (CanChaseToday() && CanHidePointSeePlayer(hidePoints[currentPairIndex].position))
+                            {
+                                Debug.LogWarning($"[Monster] HidePoint[{currentPairIndex}] still sees player after stalking. Starting CHASE!");
+                                StartChasing();
+                                return;
+                            }
+
                             Debug.Log("[Monster] Stalk stay duration expired. Retreating.");
                             Retreat();
                         }
@@ -328,8 +332,7 @@ namespace Horror
                     float t = Mathf.Clamp01(elapsed / speedDecayDuration);
                     agent.speed = Mathf.Lerp(initialChaseSpeed, finalChaseSpeed, t);
 
-                    // Check if player is detected (line of sight or noise)
-                    bool playerDetected = CanSeePlayer() || (threat >= soundDetectionThreshold);
+                    bool playerDetected = CanSeePlayer();
 
                     if (playerDetected)
                     {
@@ -392,15 +395,12 @@ namespace Horror
                     break;
 
                 case MonsterState.Searching:
-                    // Resume chase if player is detected again
                     bool searchCanSeePlayer = CanSeePlayer();
-                    bool searchCanHearPlayer = threat >= soundDetectionThreshold;
-                    if ((searchCanSeePlayer || searchCanHearPlayer)
+                    if (searchCanSeePlayer
                         && !IsNearBlockedChasePosition()
                         && TryGetReachableNavMeshPosition(playerController.transform.position, out _))
                     {
-                        string reason = searchCanSeePlayer ? "Player spotted" : $"Player too loud (Threat: {threat:F1} >= {soundDetectionThreshold:F1})";
-                        Debug.LogWarning($"[Monster] Player re-detected ({reason}) during search! Resuming CHASE!");
+                        Debug.LogWarning("[Monster] Player spotted during search! Resuming CHASE!");
                         StartChasing(false);
                         return;
                     }
@@ -425,6 +425,12 @@ namespace Horror
                             agent.ResetPath();
                             Debug.Log($"[Monster] Reached last seen position. Look-around started for {searchDuration}s...");
                         }
+                        else if (IsSearchStuck())
+                        {
+                            threat = 0f;
+                            Debug.Log("[Monster] Search path blocked. Retreating.");
+                            Retreat();
+                        }
                     }
                     else
                     {
@@ -442,12 +448,10 @@ namespace Horror
                     break;
 
                 case MonsterState.BackingAway:
-                    // If player gets close and is detected again during retreat, resume chase!
                     float backingAwayDistToPlayer = Vector3.Distance(monsterObject.transform.position, playerCamera.transform.position);
-                    if (backingAwayDistToPlayer < loseDistance && (CanSeePlayer() || threat >= soundDetectionThreshold))
+                    if (backingAwayDistToPlayer < loseDistance && CanSeePlayer())
                     {
-                        string reason = CanSeePlayer() ? "Player spotted" : $"Player too loud (Threat: {threat:F1} >= {soundDetectionThreshold:F1})";
-                        Debug.LogWarning($"[Monster] Player re-entered loseDistance ({backingAwayDistToPlayer:F1} < {loseDistance:F1}) and detected ({reason}) during retreat! Resuming CHASE!");
+                        Debug.LogWarning($"[Monster] Player re-entered loseDistance ({backingAwayDistToPlayer:F1} < {loseDistance:F1}) and was spotted during retreat! Resuming CHASE!");
                         StartChasing(false);
                         return;
                     }
@@ -505,7 +509,7 @@ namespace Horror
             monsterObject.transform.position = hidePoint.position; // Manually sync transform when updatePosition is false
             stateEnterTime = Time.time;
 
-            if (CanChaseToday() && threat >= threatThreshold && Random.value < CurrentChaseChance)
+            if (CanChaseToday() && threat >= threatThreshold)
             {
                 Debug.Log($"[Monster] Threat high ({threat:F1} >= {threatThreshold:F1}). Transitioning to CHASE immediately!");
                 StartChasing();
@@ -538,8 +542,10 @@ namespace Horror
             nextDoorOpenTime = 0f;
             monsterObject.SetActive(true);
             agent.speed = initialChaseSpeed;
+            lastSeenPosition = playerController.transform.position;
             if (TryGetReachableNavMeshPosition(playerController.transform.position, out Vector3 reachablePlayerPos))
             {
+                lastSeenPosition = reachablePlayerPos;
                 agent.destination = reachablePlayerPos;
             }
             PlayAnimation("FastWalking");
@@ -555,10 +561,11 @@ namespace Horror
             state = MonsterState.Searching;
             stateEnterTime = Time.time;
             searchEndTime = 0f;
+            chaseStuckStartTime = Time.time;
             agent.speed = moveSpeed;
             agent.destination = lastSeenPosition;
             PlayAnimation("Walking");
-            Debug.Log($"[Monster] Lost player (LOS blocked & Threat {threat:F1} < {soundDetectionThreshold:F1}). Searching last seen position: {lastSeenPosition}");
+            Debug.Log($"[Monster] Lost line of sight. Searching last seen position: {lastSeenPosition}");
         }
 
         private bool CanChaseToday()
@@ -657,43 +664,15 @@ namespace Horror
             jumpscareAudioSource.PlayOneShot(jumpscareClip);
         }
 
-        private void AutoAssignPointArrays()
+        public void AddDoorThreat()
         {
-            Transform[] transforms = FindObjectsByType<Transform>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-            if (stalkPoints == null || stalkPoints.Length == 0)
-            {
-                stalkPoints = FindNamedPoints(transforms, "StalkPoint");
-            }
-
-            if (hidePoints == null || hidePoints.Length == 0)
-            {
-                hidePoints = FindNamedPoints(transforms, "HidePoint");
-            }
+            threat += doorThreat;
+            Debug.Log($"[Monster] Door used! Threat +{doorThreat}. Current threat: {threat:F1}");
         }
 
-        private Transform[] FindNamedPoints(Transform[] transforms, string prefix)
+        public void ClearBlockedChasePosition()
         {
-            List<Transform> points = new();
-            for (int i = 0; i < transforms.Length; i++)
-            {
-                if (IsPointName(transforms[i].name, prefix))
-                {
-                    points.Add(transforms[i]);
-                }
-            }
-
-            Transform[] result = points.ToArray();
-            System.Array.Sort(result, (a, b) => string.CompareOrdinal(a.name, b.name));
-            return result;
-        }
-
-        private bool IsPointName(string objectName, string prefix)
-        {
-            if (!objectName.StartsWith(prefix)) return false;
-            if (objectName.Length == prefix.Length) return true;
-
-            char next = objectName[prefix.Length];
-            return !char.IsLetter(next);
+            hasBlockedChasePlayerPosition = false;
         }
 
         private bool CanSeePlayer()
@@ -740,6 +719,27 @@ namespace Horror
             {
                 closestChaseDistance = distance;
                 chaseStuckStartTime = Time.time;
+            }
+
+            return Time.time - chaseStuckStartTime >= chaseStuckSearchDelay;
+        }
+
+        private bool IsSearchStuck()
+        {
+            if (Time.time - stateEnterTime < 0.2f || agent.pathPending)
+            {
+                return false;
+            }
+
+            if (!agent.hasPath || agent.pathStatus != NavMeshPathStatus.PathComplete)
+            {
+                return true;
+            }
+
+            if (agent.velocity.sqrMagnitude > 0.01f)
+            {
+                chaseStuckStartTime = Time.time;
+                return false;
             }
 
             return Time.time - chaseStuckStartTime >= chaseStuckSearchDelay;
@@ -840,7 +840,10 @@ namespace Horror
 
         private bool ShouldVanishNow()
         {
-            return vanishWhenLookedAt && IsInView(monsterObject.transform.position);
+            Vector3 position = monsterObject.transform.position;
+            return vanishWhenLookedAt
+                && IsInView(position)
+                && HasClearViewFromPlayer(position + Vector3.up * 1.5f);
         }
 
         private bool IsInView(Vector3 position)
@@ -851,6 +854,16 @@ namespace Horror
                 && viewportPoint.x <= 1f
                 && viewportPoint.y >= 0f
                 && viewportPoint.y <= 1f;
+        }
+
+        private bool HasClearViewFromPlayer(Vector3 position)
+        {
+            if (!Physics.Linecast(playerCamera.transform.position, position, out RaycastHit hit))
+            {
+                return true;
+            }
+
+            return hit.transform == monsterObject.transform || hit.transform.IsChildOf(monsterObject.transform);
         }
 
         private void ApplyBodyShake()
