@@ -1,4 +1,5 @@
 using System.Collections;
+using Unity.AI.Navigation;
 using UnityEngine;
 using UnityEngine.Events;
 
@@ -57,7 +58,7 @@ namespace DoorSystem
 
         #region Runtime Fields
 
-        Coroutine waitStateRoutine;
+        private Coroutine waitStateRoutine;
 
         #endregion
 
@@ -237,9 +238,52 @@ namespace DoorSystem
             }
 
             doorState = finalState;
+            RefreshActiveNavMeshSurfaces();
 
             endEvent?.Invoke();
             waitStateRoutine = null;
+        }
+
+        private static void RefreshActiveNavMeshSurfaces()
+        {
+            IgnoreUnreadableNavMeshSources();
+
+            for (int i = 0; i < NavMeshSurface.activeSurfaces.Count; i++)
+            {
+                NavMeshSurface surface = NavMeshSurface.activeSurfaces[i];
+                if (surface.navMeshData == null) continue;
+
+                surface.UpdateNavMesh(surface.navMeshData);
+            }
+        }
+
+        private static void IgnoreUnreadableNavMeshSources()
+        {
+            MeshFilter[] meshFilters = FindObjectsByType<MeshFilter>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            for (int i = 0; i < meshFilters.Length; i++)
+            {
+                IgnoreUnreadableNavMeshSource(meshFilters[i].gameObject, meshFilters[i].sharedMesh);
+            }
+
+            MeshCollider[] meshColliders = FindObjectsByType<MeshCollider>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            for (int i = 0; i < meshColliders.Length; i++)
+            {
+                IgnoreUnreadableNavMeshSource(meshColliders[i].gameObject, meshColliders[i].sharedMesh);
+            }
+        }
+
+        private static void IgnoreUnreadableNavMeshSource(GameObject source, Mesh mesh)
+        {
+            if (mesh == null || mesh.isReadable) return;
+
+            NavMeshModifier modifier = source.GetComponent<NavMeshModifier>();
+            if (modifier == null)
+            {
+                modifier = source.AddComponent<NavMeshModifier>();
+            }
+
+            modifier.ignoreFromBuild = true;
+            modifier.applyToChildren = false;
         }
 
         #endregion

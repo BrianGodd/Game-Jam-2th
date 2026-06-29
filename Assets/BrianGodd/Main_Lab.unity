@@ -8859,11 +8859,21 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 3508752555183538048, guid: e73c1c658aeddd042bc049a907126289,
+        type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 4030820382000731091, guid: e73c1c658aeddd042bc049a907126289,
         type: 3}
       propertyPath: m_Controller
       value: 
       objectReference: {fileID: 9100000, guid: 8e2f89518e7deee48a32d327657d4412, type: 2}
+    - target: {fileID: 4935744688755081505, guid: e73c1c658aeddd042bc049a907126289,
+        type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 6090240345492802338, guid: e73c1c658aeddd042bc049a907126289,
         type: 3}
       propertyPath: m_LocalPosition.x
@@ -8872,7 +8882,7 @@ PrefabInstance:
     - target: {fileID: 6090240345492802338, guid: e73c1c658aeddd042bc049a907126289,
         type: 3}
       propertyPath: m_LocalPosition.y
-      value: -1.51
+      value: -1.54
       objectReference: {fileID: 0}
     - target: {fileID: 6090240345492802338, guid: e73c1c658aeddd042bc049a907126289,
         type: 3}
@@ -15178,6 +15188,12 @@ PrefabInstance:
       propertyPath: stalkPoints.Array.data[5]
       value: 
       objectReference: {fileID: 1543722541}
+    - target: {fileID: 8032852224277358888, guid: 610613bca9e91fa4b9a361e313b5d19b,
+        type: 3}
+      propertyPath: m_NavMeshData
+      value: 
+      objectReference: {fileID: 23800000, guid: efed7697ad4ef4947ac26927a80b1048,
+        type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects:
