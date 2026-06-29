@@ -77,6 +77,9 @@ public class GameManager : MonoBehaviour
         var gameTimer = StartCoroutine(GameTimer());
 
         float gameLengthSeconds = gameLengthMinutes * 60f;
+
+        yield return null;
+
         while (elapsedTimeSeconds < gameLengthSeconds)
         {
             if (gameObjective.IsCompleted())
@@ -134,28 +137,28 @@ public class GameManager : MonoBehaviour
         ReloadActiveScene();
     }
 
-    private void Update()
-    {
-        bool nextDayPressed = false;
-#if ENABLE_INPUT_SYSTEM
-        if (UnityEngine.InputSystem.Keyboard.current != null && UnityEngine.InputSystem.Keyboard.current.nKey.wasPressedThisFrame)
-        {
-            nextDayPressed = true;
-        }
-#endif
-#if ENABLE_LEGACY_INPUT_MANAGER
-        if (!nextDayPressed && Input.GetKeyDown(KeyCode.N))
-        {
-            nextDayPressed = true;
-        }
-#endif
+//     private void Update()
+//     {
+//         bool nextDayPressed = false;
+// #if ENABLE_INPUT_SYSTEM
+//         if (UnityEngine.InputSystem.Keyboard.current != null && UnityEngine.InputSystem.Keyboard.current.nKey.wasPressedThisFrame)
+//         {
+//             nextDayPressed = true;
+//         }
+// #endif
+// #if ENABLE_LEGACY_INPUT_MANAGER
+//         if (!nextDayPressed && Input.GetKeyDown(KeyCode.N))
+//         {
+//             nextDayPressed = true;
+//         }
+// #endif
 
-        if (nextDayPressed)
-        {
-            Debug.Log("[Debug] Direct transition to the next day triggered.");
-            WinGame();
-        }
-    }
+//         if (nextDayPressed)
+//         {
+//             Debug.Log("[Debug] Direct transition to the next day triggered.");
+//             WinGame();
+//         }
+//     }
 
     public void CleanupGame()
     {
