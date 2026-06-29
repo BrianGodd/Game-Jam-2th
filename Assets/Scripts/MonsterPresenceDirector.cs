@@ -75,14 +75,6 @@ namespace Horror
         public float escapeDistance = 8f;
         public float escapeDuration = 3f;
 
-        [Header("Stealth Settings")]
-        [Tooltip("Minimum distance from monster to player for hiding to succeed.")]
-        public float hideMinDistance = 5f;
-        [Tooltip("Max distance above player camera/head to check for obstruction/ceiling.")]
-        public float headObstructionCheckDistance = 1.5f;
-        [Tooltip("Layer mask for objects that can hide the player (e.g. Default, Environment).")]
-        public LayerMask hidingObstructionLayers = ~0;
-
         [Header("Jumpscare Settings")]
         public AudioSource jumpscareAudioSource;
         public AudioClip jumpscareClip;
@@ -337,9 +329,7 @@ namespace Horror
                     agent.speed = Mathf.Lerp(initialChaseSpeed, finalChaseSpeed, t);
 
                     // Check if player is detected (line of sight or noise)
-                    float distToPlayer = Vector3.Distance(monsterObject.transform.position, playerCamera.transform.position);
-                    bool isHiding = IsPlayerHiding() && distToPlayer >= hideMinDistance;
-                    bool playerDetected = !isHiding && (CanSeePlayer() || (threat >= soundDetectionThreshold));
+                    bool playerDetected = CanSeePlayer() || (threat >= soundDetectionThreshold);
 
                     if (playerDetected)
                     {
@@ -403,12 +393,9 @@ namespace Horror
 
                 case MonsterState.Searching:
                     // Resume chase if player is detected again
-                    float searchDistToPlayer = Vector3.Distance(monsterObject.transform.position, playerCamera.transform.position);
-                    bool searchIsHiding = IsPlayerHiding() && searchDistToPlayer >= hideMinDistance;
                     bool searchCanSeePlayer = CanSeePlayer();
                     bool searchCanHearPlayer = threat >= soundDetectionThreshold;
-                    if (!searchIsHiding
-                        && (searchCanSeePlayer || searchCanHearPlayer)
+                    if ((searchCanSeePlayer || searchCanHearPlayer)
                         && !IsNearBlockedChasePosition()
                         && TryGetReachableNavMeshPosition(playerController.transform.position, out _))
                     {
@@ -457,8 +444,7 @@ namespace Horror
                 case MonsterState.BackingAway:
                     // If player gets close and is detected again during retreat, resume chase!
                     float backingAwayDistToPlayer = Vector3.Distance(monsterObject.transform.position, playerCamera.transform.position);
-                    bool backingAwayIsHiding = IsPlayerHiding() && backingAwayDistToPlayer >= hideMinDistance;
-                    if (backingAwayDistToPlayer < loseDistance && !backingAwayIsHiding && (CanSeePlayer() || threat >= soundDetectionThreshold))
+                    if (backingAwayDistToPlayer < loseDistance && (CanSeePlayer() || threat >= soundDetectionThreshold))
                     {
                         string reason = CanSeePlayer() ? "Player spotted" : $"Player too loud (Threat: {threat:F1} >= {soundDetectionThreshold:F1})";
                         Debug.LogWarning($"[Monster] Player re-entered loseDistance ({backingAwayDistToPlayer:F1} < {loseDistance:F1}) and detected ({reason}) during retreat! Resuming CHASE!");
@@ -710,45 +696,10 @@ namespace Horror
             return !char.IsLetter(next);
         }
 
-        private bool IsPlayerHiding()
-        {
-            if (playerController == null) return false;
-
-            var inputs = playerController.GetComponent<StarterAssets.StarterAssetsInputs>();
-            if (inputs == null || !inputs.crouch) return false;
-
-            var cc = playerController.GetComponent<CharacterController>();
-            if (cc != null)
-            {
-                if (inputs.move.sqrMagnitude > 0.01f || cc.velocity.sqrMagnitude > 0.01f)
-                {
-                    return false;
-                }
-            }
-
-            // Raycast straight up from the player's camera position
-            Vector3 rayStart = playerCamera.transform.position;
-            Vector3 rayDir = Vector3.up;
-            int playerLayer = playerController.gameObject.layer;
-            int obstructionMask = hidingObstructionLayers & ~(1 << playerLayer);
-
-            if (Physics.Raycast(rayStart, rayDir, out RaycastHit hit, headObstructionCheckDistance, obstructionMask))
-            {
-                return true;
-            }
-
-            return false;
-        }
-
         private bool CanSeePlayer()
         {
             float dist = Vector3.Distance(monsterObject.transform.position, playerCamera.transform.position);
             if (dist > sightRange)
-            {
-                return false;
-            }
-
-            if (IsPlayerHiding() && dist >= hideMinDistance)
             {
                 return false;
             }

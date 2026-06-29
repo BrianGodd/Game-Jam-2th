@@ -155,9 +155,9 @@ MonoBehaviour:
   - {fileID: 6206587586557304794}
   monsterAnimator: {fileID: 6439286920504302152}
   rotationOffset: 180
-  firstDelay: 2
+  firstDelay: 10
   minInterval: 3
-  maxInterval: 4
+  maxInterval: 5
   stayDuration: 5
   minStalkDistance: 3
   maxStalkDistance: 20
@@ -166,18 +166,19 @@ MonoBehaviour:
   sightRange: 25
   threat: 0
   threatThreshold: 100
-  walkThreatRate: 4
-  runThreatRate: 25
-  threatDecayRate: 0.5
+  walkThreatRate: 0
+  runThreatRate: 10
+  threatDecayRate: 5
   jumpThreat: 20
-  landThreat: 50
-  chaseChance: 1
+  landThreat: 40
+  chaseChance: 0.5
+  chaseChanceDay4: 0.8
   soundDetectionThreshold: 150
   initialChaseSpeed: 10
   finalChaseSpeed: 6.5
   speedDecayDuration: 5
-  attackDistance: 1.5
-  loseDistance: 10
+  attackDistance: 2
+  loseDistance: 15
   chaseGracePeriod: 3
   searchDuration: 4
   searchExtraDistance: 2
@@ -190,7 +191,7 @@ MonoBehaviour:
   stalkArrivalDoorOpenChance: 0.25
   doorDetectionLayers:
     serializedVersion: 2
-    m_Bits: 4294967295
+    m_Bits: 1
   escapeDistance: 8
   escapeDuration: 3
   hideMinDistance: 5
